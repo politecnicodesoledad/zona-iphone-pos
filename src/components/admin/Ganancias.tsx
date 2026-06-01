@@ -170,8 +170,8 @@ export function Ganancias() {
 function Row({ label, v, bold, color }: { label: string; v: number; bold?: boolean; color?: string }) {
   return (
     <div className={`flex justify-between ${bold ? "font-bold" : ""}`}>
-      <span className={bold ? "text-white" : "text-gray-400"}>{label}</span>
-      <span style={{ color: color || (v < 0 ? "#f87171" : "var(--gold)") }}>{fmtCOP(v)}</span>
+      <span className={bold ? "text-[var(--ink)]" : "text-gray-600"}>{label}</span>
+      <span style={{ color: color || (v < 0 ? "#dc2626" : "var(--gold-dark)") }}>{fmtCOP(v)}</span>
     </div>
   );
 }
