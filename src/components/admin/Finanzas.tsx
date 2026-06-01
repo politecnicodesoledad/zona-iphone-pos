@@ -119,7 +119,7 @@ function Historial() {
               ))}
             </div>
             <div className="flex justify-between text-base font-bold pt-2"><span>Total</span><span className="text-[var(--gold)] font-display text-2xl">{fmtCOP(detail.total)}</span></div>
-            <div className="text-xs text-gray-400">Pago: <b className="text-white">{detail.tipo}</b> {detail.metodoPago && `(${detail.metodoPago})`}</div>
+            <div className="text-xs text-gray-400">Pago: <b className="text-[var(--ink)]">{detail.tipo}</b> {detail.metodoPago && `(${detail.metodoPago})`}</div>
             {detail.cliente && (
               <div className="bg-[var(--mist)] rounded-lg p-3 space-y-1 text-xs">
                 <div>👤 {detail.cliente.nombre}</div>
@@ -266,8 +266,8 @@ function Gastos() {
               {p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : p === "anio" ? "Este año" : "Todos"}
             </button>
           )}
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
+          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
+          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
         </div>
         <table className="w-full text-sm">
           <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">

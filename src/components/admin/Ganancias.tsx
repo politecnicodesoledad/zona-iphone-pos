@@ -69,12 +69,12 @@ export function Ganancias() {
           ))}
           {periodo === "custom" && (
             <div className="flex gap-2 items-center">
-              <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
+              <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
               <span className="text-gray-500 text-xs">→</span>
-              <input type="date" value={to} onChange={e => setTo(e.target.value)} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
+              <input type="date" value={to} onChange={e => setTo(e.target.value)} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
             </div>
           )}
-          <select value={local} onChange={e => setLocal(e.target.value as never)} className="ml-auto px-3 py-1.5 bg-white border border-[var(--line)] rounded-full text-xs text-white">
+          <select value={local} onChange={e => setLocal(e.target.value as never)} className="ml-auto px-3 py-1.5 bg-white border border-[var(--line)] rounded-full text-xs text-[var(--ink)]">
             <option value="todos">Todos los locales</option>
             <option value="1">Local 1</option>
             <option value="2">Local 2</option>
