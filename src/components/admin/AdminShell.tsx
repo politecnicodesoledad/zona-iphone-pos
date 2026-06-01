@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BarChart3, ShoppingBag, Wallet, Package, Users, Settings, LogOut } from "lucide-react";
+import { BarChart3, ShoppingBag, Wallet, Package, Users, Settings, LogOut, Menu, X } from "lucide-react";
 import { useSession, useConfig, useFacturaNum } from "@/lib/zi/store";
 import { fmtFactura } from "@/lib/zi/store";
 import { Ganancias } from "./Ganancias";
@@ -16,10 +16,12 @@ export function AdminShell() {
   const [cfg] = useConfig();
   const [num] = useFacturaNum();
   const [mod, setMod] = useState<Mod>("ganancias");
+  const [open, setOpen] = useState(false);
   const [clock, setClock] = useState("");
+
   useEffect(() => {
     const t = () => setClock(new Date().toLocaleString("es-CO", {
-      weekday: "short", day: "2-digit", month: "short", year: "numeric",
+      weekday: "short", day: "2-digit", month: "short",
       hour: "2-digit", minute: "2-digit", hour12: true,
     }));
     t(); const i = setInterval(t, 30000); return () => clearInterval(i);
@@ -27,7 +29,7 @@ export function AdminShell() {
 
   const items: { id: Mod; icon: typeof BarChart3; label: string; badge?: string }[] = [
     { id: "ganancias", icon: BarChart3, label: "Ganancias" },
-    { id: "venta", icon: ShoppingBag, label: "Nueva Venta", badge: fmtFactura(num) },
+    { id: "venta", icon: ShoppingBag, label: "Nueva venta", badge: fmtFactura(num) },
     { id: "finanzas", icon: Wallet, label: "Finanzas" },
     { id: "inventario", icon: Package, label: "Inventario" },
     { id: "clientes", icon: Users, label: "Clientes" },
@@ -35,61 +37,81 @@ export function AdminShell() {
   ];
 
   const TITLES: Record<Mod, string> = {
-    ganancias: "Ganancias",
-    venta: "Nueva Venta",
-    finanzas: "Finanzas",
+    ganancias: "Resumen de ganancias",
+    venta: "Registrar nueva venta",
+    finanzas: "Finanzas y movimientos",
     inventario: "Inventario",
-    clientes: "Clientes y Empleados",
+    clientes: "Clientes y empleados",
     config: "Configuración",
   };
 
-  return (
-    <div className="flex min-h-screen bg-[#0a0a0a] text-white">
-      {/* SIDEBAR */}
-      <aside className="w-56 shrink-0 bg-[#0f0d0a] border-r border-[var(--gold)]/20 flex flex-col">
-        <div className="p-4 border-b border-[var(--gold)]/10 flex items-center gap-2">
-          <img src={cfg.logoUrl} alt="" className="w-9 h-9" />
-          <div>
-            <div className="font-display text-[var(--gold)] text-lg leading-tight">ADMIN</div>
-            <div className="text-[9px] text-gray-500 uppercase tracking-widest">Zona iPhone</div>
-          </div>
+  const Sidebar = (
+    <aside className="w-64 shrink-0 bg-white border-r border-[var(--line)] flex flex-col">
+      <div className="px-5 py-5 border-b border-[var(--line)] flex items-center gap-3">
+        <img src={cfg.logoUrl} alt="" className="w-11 h-11 rounded-xl bg-[var(--cream)] p-1 border border-[var(--line)]" />
+        <div className="leading-tight">
+          <div className="font-display text-xl text-[var(--ink)]">{cfg.storeName}</div>
+          <div className="text-[9px] text-[var(--gold-dark)] font-bold tracking-[0.2em] uppercase">Panel admin</div>
         </div>
-        <nav className="flex-1 p-2 space-y-1">
-          {items.map(it => (
-            <button key={it.id} onClick={() => setMod(it.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
-                      mod === it.id ? "bg-[var(--gold)]/15 text-[var(--gold)] border border-[var(--gold)]/30" : "text-gray-400 hover:bg-white/5"
+      </div>
+      <nav className="flex-1 p-3 space-y-1">
+        {items.map(it => {
+          const active = mod === it.id;
+          return (
+            <button key={it.id} onClick={() => { setMod(it.id); setOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition group ${
+                      active
+                        ? "bg-[var(--ink)] text-white shadow-md"
+                        : "text-gray-600 hover:bg-[var(--mist)] hover:text-[var(--ink)]"
                     }`}>
-              <it.icon className="w-4 h-4" />
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${active ? "bg-[var(--gold)] text-[var(--ink)]" : "bg-[var(--mist)] text-gray-500 group-hover:bg-white group-hover:text-[var(--gold-dark)]"}`}>
+                <it.icon className="w-4 h-4" />
+              </span>
               <span className="flex-1 text-left">{it.label}</span>
-              {it.badge && <span className="text-[10px] bg-[var(--gold)]/20 text-[var(--gold)] px-1.5 py-0.5 rounded">{it.badge}</span>}
+              {it.badge && <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${active ? "bg-white/15 text-white" : "bg-[var(--cream)] text-[var(--gold-dark)]"}`}>{it.badge}</span>}
             </button>
-          ))}
-        </nav>
-        <button onClick={logout} className="m-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-red-500/10 hover:text-red-400 flex items-center gap-2 border border-white/5">
-          <LogOut className="w-4 h-4" /> Cerrar sesión
-        </button>
-      </aside>
+          );
+        })}
+      </nav>
+      <button onClick={logout} className="m-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-2 border border-[var(--line)] transition">
+        <LogOut className="w-4 h-4" /> Cerrar sesión
+      </button>
+    </aside>
+  );
 
-      {/* MAIN */}
+  return (
+    <div className="flex min-h-screen bg-[var(--mist)] text-[var(--ink)]">
+      <div className="hidden md:flex">{Sidebar}</div>
+      {open && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-0 h-full flex animate-fade-up">{Sidebar}</div>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-[#0f0d0a] border-b border-[var(--gold)]/10 px-5 flex items-center justify-between">
-          <h1 className="font-display text-2xl text-[var(--gold)]">{TITLES[mod]}</h1>
-          <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-green-400">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> En vivo
+        <header className="h-16 bg-white border-b border-[var(--line)] px-5 flex items-center justify-between gap-4 sticky top-0 z-30">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setOpen(true)} className="md:hidden w-9 h-9 rounded-lg hover:bg-[var(--mist)] flex items-center justify-center"><Menu className="w-5 h-5" /></button>
+            <h1 className="font-display text-2xl text-[var(--ink)] truncate">{TITLES[mod]}</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En vivo
             </span>
-            <span className="text-xs text-gray-400">{clock}</span>
-            <span className="text-xs bg-[var(--gold)]/10 text-[var(--gold)] px-2 py-1 rounded border border-[var(--gold)]/20">Factura: {fmtFactura(num)}</span>
+            <span className="hidden md:inline text-xs text-gray-500 font-medium">{clock}</span>
+            <span className="text-[11px] bg-[var(--cream)] text-[var(--gold-dark)] px-2.5 py-1 rounded-full font-bold border border-[var(--gold)]/30">Factura · {fmtFactura(num)}</span>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-5 scrollbar-thin">
-          {mod === "ganancias" && <Ganancias />}
-          {mod === "venta" && <NuevaVenta />}
-          {mod === "finanzas" && <Finanzas />}
-          {mod === "inventario" && <Inventario />}
-          {mod === "clientes" && <ClientesEmpleados />}
-          {mod === "config" && <Configuracion />}
+        <main className="flex-1 overflow-auto p-5 md:p-7 scrollbar-thin">
+          <div className="max-w-[1400px] mx-auto animate-fade-up">
+            {mod === "ganancias" && <Ganancias />}
+            {mod === "venta" && <NuevaVenta />}
+            {mod === "finanzas" && <Finanzas />}
+            {mod === "inventario" && <Inventario />}
+            {mod === "clientes" && <ClientesEmpleados />}
+            {mod === "config" && <Configuracion />}
+          </div>
         </main>
       </div>
     </div>
