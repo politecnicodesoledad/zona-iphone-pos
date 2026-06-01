@@ -1,6 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Instagram, Facebook, MessageCircle, Search, MapPin, Clock, Phone, Wrench, Menu, X, Volume2, VolumeX } from "lucide-react";
+import {
+  Instagram, Facebook, MessageCircle, Search, MapPin, Clock, Wrench, Menu, X,
+  Volume2, VolumeX, ShieldCheck, CreditCard, Truck, Smartphone, ArrowRight, Sparkles, Star,
+} from "lucide-react";
 import { useConfig, useProductos, useOtros } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
 import type { Producto, ColorOpt } from "@/lib/zi/types";
@@ -20,13 +23,12 @@ function PublicIndex() {
   const [muted, setMuted] = useState(true);
   const [quote, setQuote] = useState<{ p: Producto; color?: ColorOpt } | null>(null);
 
-  // filtros
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("todos");
   const [cond, setCond] = useState<"todos" | "nuevo" | "usado">("todos");
   const [sort, setSort] = useState<"reciente" | "asc" | "desc">("reciente");
 
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 1200); return () => clearTimeout(t); }, []);
+  useEffect(() => { const t = setTimeout(() => setLoading(false), 900); return () => clearTimeout(t); }, []);
 
   const visibles = useMemo(() => {
     let arr = productos.filter(p => p.stock > 0);
@@ -42,7 +44,6 @@ function PublicIndex() {
     return arr;
   }, [productos, cat, cond, q, sort]);
 
-  // Event countdown
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   const countdown = useMemo(() => {
@@ -57,98 +58,134 @@ function PublicIndex() {
     };
   }, [cfg.eventActive, cfg.eventEndDate, now]);
   const promoProduct = productos.find(p => p.id === cfg.eventPromoProductId);
-
   const waLink = (text: string) => `https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent(text)}`;
 
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div className="min-h-screen bg-white text-[var(--ink)]">
       {/* LOADING */}
       {loading && (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0A0A0A] transition-opacity">
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white">
           <img src={cfg.logoUrl} alt="" className="w-20 h-20 animate-load-pulse" />
-          <div className="mt-6 w-8 h-8 rounded-full border-2 border-[var(--gold)]/30 border-t-[var(--gold)] animate-spin" />
-          <p className="mt-4 text-[var(--gold)]/70 text-xs tracking-[0.4em] font-semibold">CARGANDO</p>
+          <div className="mt-6 w-8 h-8 rounded-full border-2 border-[var(--gold)]/25 border-t-[var(--gold)] animate-spin" />
+          <p className="mt-4 text-[var(--gold-dark)] text-[11px] tracking-[0.4em] font-bold">CARGANDO</p>
         </div>
       )}
 
-      {/* NAV */}
-      <nav className="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-white/5">
-        <div className="max-w-7xl mx-auto h-14 px-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={cfg.logoUrl} alt="" className="w-9 h-9" />
+      {/* NAV — light, sticky */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[var(--line)]">
+        <div className="max-w-7xl mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src={cfg.logoUrl} alt="" className="w-10 h-10 rounded-lg" />
             <div className="leading-tight">
-              <div className="font-display text-white text-lg">ZONA iPHONE</div>
-              <div className="text-[9px] text-[var(--gold)] font-bold tracking-widest">{cfg.direccion.split(",")[2]?.trim() || "Barranquilla · Colombia"}</div>
+              <div className="font-display text-[var(--ink)] text-xl">ZONA<span className="text-[var(--gold-dark)]">iPHONE</span></div>
+              <div className="text-[9px] text-gray-500 font-semibold tracking-[0.25em]">BARRANQUILLA · CO</div>
             </div>
           </Link>
-          <div className="hidden md:flex items-center gap-6">
-            {["catalogo","servicios","servicio-tecnico","ubicacion"].map(id => (
-              <a key={id} href={"#"+id} className="text-[11px] font-semibold uppercase tracking-[1.5px] text-gray-400 hover:text-[var(--gold)] transition">
-                {id === "catalogo" ? "Catálogo" : id === "servicios" ? "Servicios" : id === "servicio-tecnico" ? "Técnico" : "Ubicación"}
+          <div className="hidden md:flex items-center gap-7">
+            {[["catalogo","Catálogo"],["servicios","Servicios"],["servicio-tecnico","Técnico"],["ubicacion","Ubicación"]].map(([id,l]) => (
+              <a key={id} href={"#"+id} className="text-[12px] font-semibold text-gray-600 hover:text-[var(--ink)] transition relative after:absolute after:left-0 after:-bottom-1 after:w-0 after:h-[2px] after:bg-[var(--gold)] hover:after:w-full after:transition-all">
+                {l}
               </a>
             ))}
           </div>
           <div className="hidden md:flex items-center gap-2">
             <SocialIcon href={cfg.instagram}><Instagram className="w-4 h-4" /></SocialIcon>
             <SocialIcon href={cfg.facebook}><Facebook className="w-4 h-4" /></SocialIcon>
-            <SocialIcon href={waLink("Hola Zona iPhone!")} hoverColor="#25D366"><MessageCircle className="w-4 h-4" /></SocialIcon>
+            <a href={waLink("Hola Zona iPhone!")} target="_blank" rel="noreferrer" className="ml-2 zi-btn-ink text-[11px] py-2.5 px-4 inline-flex items-center gap-1.5">
+              <MessageCircle className="w-3.5 h-3.5" /> Escríbenos
+            </a>
           </div>
-          <button className="md:hidden text-white" onClick={() => setMenu(v => !v)}>
-            {menu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          <button className="md:hidden w-10 h-10 rounded-lg flex items-center justify-center hover:bg-[var(--mist)]" onClick={() => setMenu(v => !v)}>
+            {menu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
         {menu && (
-          <div className="md:hidden bg-black border-t border-white/5 px-4 py-4 flex flex-col gap-3">
-            {["catalogo","servicios","servicio-tecnico","ubicacion"].map(id => (
-              <a key={id} href={"#"+id} onClick={() => setMenu(false)} className="text-sm text-gray-300 uppercase font-semibold">
-                {id === "catalogo" ? "Catálogo" : id === "servicios" ? "Servicios" : id === "servicio-tecnico" ? "Técnico" : "Ubicación"}
-              </a>
+          <div className="md:hidden bg-white border-t border-[var(--line)] px-4 py-4 flex flex-col gap-3">
+            {[["catalogo","Catálogo"],["servicios","Servicios"],["servicio-tecnico","Técnico"],["ubicacion","Ubicación"]].map(([id,l]) => (
+              <a key={id} href={"#"+id} onClick={() => setMenu(false)} className="text-sm text-gray-700 font-semibold py-1.5">{l}</a>
             ))}
-            <div className="flex gap-3 pt-2">
-              <SocialIcon href={cfg.instagram}><Instagram className="w-4 h-4" /></SocialIcon>
-              <SocialIcon href={cfg.facebook}><Facebook className="w-4 h-4" /></SocialIcon>
-              <SocialIcon href={waLink("Hola!")}><MessageCircle className="w-4 h-4" /></SocialIcon>
-            </div>
+            <a href={waLink("Hola!")} target="_blank" rel="noreferrer" className="zi-btn-gold text-xs mt-2 text-center">Escríbenos por WhatsApp</a>
           </div>
         )}
       </nav>
 
-      {/* TRUST BAR */}
-      <div className="bg-gray-100 border-y border-gray-200 overflow-hidden">
-        <div className="flex animate-marquee whitespace-nowrap py-2.5">
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="flex gap-10 px-5 text-xs text-gray-700 font-semibold">
-              {["✅ Garantía incluida","💳 Crédito disponible","📱 Recibimos tu cel","🚀 Envío rápido","🔧 Servicio técnico","⭐ Máxima calidad","📍 San Andresito El Pupi"].map(t =>
-                <span key={t}>{t}</span>)}
+      {/* HERO — light, editorial */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-white via-[var(--cream)] to-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(201,168,76,0.18),transparent_45%),radial-gradient(circle_at_10%_90%,rgba(201,168,76,0.10),transparent_50%)]" />
+        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-[var(--gold)]/10 blur-3xl" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-16 md:py-28 grid lg:grid-cols-2 gap-10 items-center">
+          <div className="animate-fade-up">
+            <span className="zi-chip"><Sparkles className="w-3 h-3" /> Apple Premium Reseller</span>
+            <h1 className="font-display mt-5 leading-[0.95] text-[var(--ink)]" style={{ fontSize: "clamp(54px, 9vw, 120px)" }}>
+              {cfg.storeName.split(" ")[0] || "ZONA"}<br />
+              <span className="text-[var(--gold-dark)]">{cfg.storeName.split(" ")[1] || "iPhone"}</span>
+            </h1>
+            <p className="mt-5 text-base md:text-lg text-gray-600 max-w-md leading-relaxed">
+              {cfg.misionQuote}
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <a href="#catalogo" className="zi-btn-gold inline-flex items-center gap-2 text-sm">
+                Ver catálogo <ArrowRight className="w-4 h-4" />
+              </a>
+              <a href={waLink("Hola Zona iPhone!")} target="_blank" rel="noreferrer" className="zi-btn-ink text-sm inline-flex items-center gap-2">
+                <MessageCircle className="w-4 h-4" /> Cotizar ahora
+              </a>
             </div>
-          ))}
+            <div className="mt-10 flex gap-6 flex-wrap">
+              {[["+5", "años de confianza"],["1k+","clientes felices"],["100%","garantía"]].map(([n,l]) => (
+                <div key={l}>
+                  <div className="font-display text-3xl text-[var(--ink)]">{n}</div>
+                  <div className="text-[11px] uppercase tracking-[0.15em] text-gray-500 font-semibold">{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* visual */}
+          <div className="relative aspect-square max-w-md mx-auto w-full">
+            <div className="absolute inset-8 bg-gradient-to-br from-[var(--cream)] to-white rounded-[3rem] shadow-soft border border-[var(--line)]" />
+            <div className="absolute inset-0 flex items-center justify-center animate-float">
+              <img src={cfg.logoUrl} alt="" className="w-48 h-48 drop-shadow-2xl" />
+            </div>
+            <div className="absolute top-6 right-2 bg-white rounded-2xl shadow-soft border border-[var(--line)] p-3 animate-float" style={{ animationDelay: "1s" }}>
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-lg bg-[var(--cream)] flex items-center justify-center"><ShieldCheck className="w-4 h-4 text-[var(--gold-dark)]" /></div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Garantía</div>
+                  <div className="text-xs font-bold text-[var(--ink)]">30 días</div>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-6 left-0 bg-white rounded-2xl shadow-soft border border-[var(--line)] p-3 animate-float" style={{ animationDelay: "2s" }}>
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-lg bg-[var(--cream)] flex items-center justify-center"><CreditCard className="w-4 h-4 text-[var(--gold-dark)]" /></div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Pago</div>
+                  <div className="text-xs font-bold text-[var(--ink)]">A crédito</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* HERO */}
-      <section className="relative bg-[#0A0A0A] text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,oklch(0.3_0.1_85_/_0.4),transparent_60%)]" />
-        <div className="relative max-w-6xl mx-auto px-4 py-20 md:py-28 text-center">
-          <img src={cfg.logoUrl} alt="" className="w-24 h-24 mx-auto animate-float" />
-          <div className="mt-6 text-[10px] tracking-[0.4em] text-[var(--gold)] font-bold uppercase">📍 Barranquilla, Colombia</div>
-          <h1 className="font-display mt-3 leading-none" style={{ fontSize: "clamp(64px, 12vw, 150px)" }}>
-            ZONA<br />
-            <span className="text-white">i</span><span className="text-[var(--gold)]">Phone</span>
-          </h1>
-          <p className="mt-4 text-xs md:text-sm uppercase tracking-[0.3em] text-gray-400">{cfg.storeSubtitle}</p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <a href="#catalogo" className="px-7 py-3.5 rounded-md font-extrabold uppercase text-xs tracking-wider text-black bg-gradient-to-br from-[var(--gold-light)] via-[var(--gold)] to-[var(--gold-dark)]">Ver catálogo</a>
-            <a href={waLink("Hola Zona iPhone!")} target="_blank" rel="noreferrer" className="px-7 py-3.5 rounded-md font-extrabold uppercase text-xs tracking-wider border border-white/25 text-white hover:border-[var(--gold)] hover:text-[var(--gold)] transition">Contáctanos</a>
+        {/* trust marquee */}
+        <div className="relative border-y border-[var(--line)] bg-white/60 overflow-hidden">
+          <div className="flex animate-marquee whitespace-nowrap py-3.5">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="flex gap-12 px-6 text-[11px] text-gray-600 font-semibold uppercase tracking-[0.15em]">
+                {["✦ Garantía incluida","✦ Crédito disponible","✦ Recibimos tu cel","✦ Envío rápido","✦ Servicio técnico","✦ Apple original","✦ San Andresito El Pupi"].map(t =>
+                  <span key={t}>{t}</span>)}
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* VIDEO */}
+      {/* VIDEO opcional */}
       {cfg.videoUrl && (
-        <section className="relative bg-black h-[60vh] overflow-hidden">
+        <section className="relative bg-[var(--ink)] h-[55vh] overflow-hidden">
           <video src={cfg.videoUrl} autoPlay loop muted={muted} playsInline className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/40" />
-          <button onClick={() => setMuted(v => !v)} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-black/70 border border-[var(--gold)] text-[var(--gold)] flex items-center justify-center">
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--ink)]/80 via-transparent to-transparent" />
+          <button onClick={() => setMuted(v => !v)} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white text-[var(--ink)] flex items-center justify-center shadow-lg hover:scale-105 transition">
             {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
         </section>
@@ -156,26 +193,26 @@ function PublicIndex() {
 
       {/* EVENT BANNER */}
       {cfg.eventActive && countdown && (
-        <section className="bg-[#0A0A0A] text-white py-12 px-4 border-y-2 border-[var(--gold)]">
+        <section className="py-16 px-4 bg-gradient-to-br from-[var(--cream)] via-white to-[var(--cream)] border-y border-[var(--gold)]/20">
           <div className="max-w-5xl mx-auto text-center">
-            <div className="inline-block px-3 py-1 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] text-xs uppercase font-bold tracking-widest animate-pulse">{cfg.eventTitle || "Evento Especial"}</div>
-            <h2 className="font-display mt-4 text-5xl md:text-7xl text-[var(--gold)]">{cfg.eventTitle}</h2>
-            <p className="mt-2 text-gray-300">{cfg.eventSubtitle}</p>
-            <div className="mt-6 flex justify-center gap-4">
+            <span className="zi-chip animate-pulse"><Sparkles className="w-3 h-3" /> {cfg.eventTitle || "Evento especial"}</span>
+            <h2 className="font-display mt-4 text-5xl md:text-7xl text-[var(--ink)]">{cfg.eventTitle}</h2>
+            <p className="mt-2 text-gray-600">{cfg.eventSubtitle}</p>
+            <div className="mt-7 flex justify-center gap-3 flex-wrap">
               {[["d","Días"],["h","Horas"],["m","Min"],["s","Seg"]].map(([k,l]) => (
-                <div key={k} className="px-4 py-3 bg-white/5 rounded-lg border border-[var(--gold)]/30 min-w-[70px]">
-                  <div className="font-display text-3xl text-[var(--gold)]">{String(countdown[k as "d"]).padStart(2,"0")}</div>
-                  <div className="text-[10px] uppercase text-gray-400 tracking-wider">{l}</div>
+                <div key={k} className="px-5 py-3 bg-white rounded-2xl border border-[var(--line)] shadow-soft min-w-[80px]">
+                  <div className="font-display text-3xl text-[var(--gold-dark)]">{String(countdown[k as "d"]).padStart(2,"0")}</div>
+                  <div className="text-[10px] uppercase text-gray-500 tracking-[0.15em] font-bold">{l}</div>
                 </div>
               ))}
             </div>
             {promoProduct && (
-              <div className="mt-8 max-w-xs mx-auto bg-white text-black rounded-xl p-5 border-4 border-[var(--gold)]">
+              <div className="mt-8 max-w-xs mx-auto bg-white rounded-2xl p-5 shadow-soft border-2 border-[var(--gold)]">
                 {promoProduct.imagen && <img src={promoProduct.imagen} alt="" className="w-full h-32 object-contain" />}
-                <h3 className="mt-3 font-bold">{promoProduct.nombre}</h3>
-                <div className="font-display text-3xl text-[var(--gold-dark)] line-through">{fmtCOP(promoProduct.precio)}</div>
-                <div className="font-display text-4xl text-red-600">{fmtCOP(cfg.eventPromoPrice)}</div>
-                <button onClick={() => setQuote({ p: promoProduct })} className="mt-3 w-full py-2 bg-black text-[var(--gold)] rounded font-bold uppercase text-xs">Aprovechar</button>
+                <h3 className="mt-3 font-bold text-[var(--ink)]">{promoProduct.nombre}</h3>
+                <div className="font-display text-xl text-gray-400 line-through">{fmtCOP(promoProduct.precio)}</div>
+                <div className="font-display text-4xl text-[var(--gold-dark)]">{fmtCOP(cfg.eventPromoPrice)}</div>
+                <button onClick={() => setQuote({ p: promoProduct })} className="zi-btn-ink w-full mt-3 text-xs">Aprovechar</button>
               </div>
             )}
           </div>
@@ -183,29 +220,30 @@ function PublicIndex() {
       )}
 
       {/* CATALOGO */}
-      <section id="catalogo" className="py-16 px-4 bg-white">
+      <section id="catalogo" className="py-20 px-4 sm:px-6 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-8">
-            <div className="text-[10px] uppercase tracking-[0.4em] text-[var(--gold-dark)] font-bold">Catálogo</div>
-            <h2 className="font-display text-5xl md:text-6xl mt-2">NUESTROS DISPOSITIVOS</h2>
+          <div className="text-center mb-10">
+            <span className="zi-chip"><Smartphone className="w-3 h-3" /> Catálogo</span>
+            <h2 className="font-display text-5xl md:text-6xl mt-4 text-[var(--ink)]">Nuestros dispositivos</h2>
+            <p className="mt-3 text-gray-500 max-w-xl mx-auto">Selección curada de productos Apple con garantía y soporte local.</p>
           </div>
-          {/* filters */}
-          <div className="flex flex-col gap-3 mb-8">
-            <div className="relative max-w-md mx-auto w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar producto..." className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm" />
+
+          <div className="bg-[var(--mist)] rounded-2xl p-4 md:p-5 mb-8 border border-[var(--line)]">
+            <div className="relative mb-3">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="¿Qué estás buscando?"
+                     className="w-full pl-11 pr-4 py-3 bg-white border border-[var(--line)] rounded-xl text-sm focus:border-[var(--gold)] focus:ring-2 focus:ring-[var(--gold)]/20 outline-none transition" />
             </div>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {Object.entries(CAT_LABEL).map(([k, v]) => (
-                <button key={k} onClick={() => setCat(k)} className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition ${cat===k ? "bg-black text-[var(--gold)]" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>{v}</button>
+                <button key={k} onClick={() => setCat(k)} className={`px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-[0.08em] transition ${cat===k ? "bg-[var(--ink)] text-white shadow" : "bg-white text-gray-600 border border-[var(--line)] hover:border-[var(--gold)]"}`}>{v}</button>
               ))}
-            </div>
-            <div className="flex flex-wrap justify-center gap-2">
+              <div className="w-px h-6 bg-[var(--line)] mx-1 hidden sm:block" />
               {(["todos","nuevo","usado"] as const).map(k => (
-                <button key={k} onClick={() => setCond(k)} className={`px-3 py-1 rounded-full text-[11px] font-semibold uppercase border ${cond===k ? "border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold-dark)]" : "border-gray-200 text-gray-600"}`}>{k}</button>
+                <button key={k} onClick={() => setCond(k)} className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.08em] border transition ${cond===k ? "border-[var(--gold)] bg-[var(--cream)] text-[var(--gold-dark)]" : "border-[var(--line)] bg-white text-gray-500"}`}>{k}</button>
               ))}
-              <select value={sort} onChange={e => setSort(e.target.value as never)} className="px-3 py-1 rounded-full text-[11px] border border-gray-200">
-                <option value="reciente">Reciente</option>
+              <select value={sort} onChange={e => setSort(e.target.value as never)} className="ml-auto px-3 py-1.5 rounded-full text-[11px] bg-white border border-[var(--line)] font-semibold text-gray-600">
+                <option value="reciente">Más recientes</option>
                 <option value="desc">Mayor precio</option>
                 <option value="asc">Menor precio</option>
               </select>
@@ -213,13 +251,13 @@ function PublicIndex() {
           </div>
 
           {visibles.length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
+            <div className="text-center py-20 text-gray-400 bg-[var(--mist)] rounded-2xl border border-dashed border-[var(--line)]">
               <p className="text-sm">No hay productos disponibles en este momento.</p>
-              <p className="text-xs mt-2">Agrega productos desde el panel admin.</p>
+              <p className="text-xs mt-1">Agrega productos desde el panel admin.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {visibles.map(p => <ProductCard key={p.id} p={p} cfg={cfg} onQuote={(c) => setQuote({ p, color: c })} promoId={cfg.eventActive ? cfg.eventPromoProductId : ""} promoPrice={cfg.eventPromoPrice} />)}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
+              {visibles.map(p => <ProductCard key={p.id} p={p} onQuote={(c) => setQuote({ p, color: c })} promoId={cfg.eventActive ? cfg.eventPromoProductId : ""} promoPrice={cfg.eventPromoPrice} />)}
             </div>
           )}
         </div>
@@ -227,16 +265,21 @@ function PublicIndex() {
 
       {/* OTROS */}
       {otros.filter(o => o.stock > 0).length > 0 && (
-        <section className="bg-[#0A0A0A] text-white py-16 px-4">
+        <section className="bg-[var(--cream)] py-16 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto">
-            <h2 className="font-display text-4xl text-center mb-8">OTROS PRODUCTOS</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <span className="zi-chip">Otros</span>
+                <h2 className="font-display text-4xl mt-3 text-[var(--ink)]">Otros productos</h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {otros.filter(o => o.stock > 0).map(o => (
                 <a key={o.id} href={waLink(`Hola! Me interesa: ${o.nombre} (${fmtCOP(o.precio)})`)} target="_blank" rel="noreferrer"
-                   className="bg-white/5 border border-white/10 rounded-lg p-4 text-center hover:border-[var(--gold)] transition">
+                   className="bg-white rounded-xl p-4 text-center border border-[var(--line)] hover:border-[var(--gold)] hover:shadow-soft hover:-translate-y-0.5 transition">
                   {o.imagen ? <img src={o.imagen} alt="" className="w-full h-20 object-contain" /> : <div className="text-3xl">📱</div>}
-                  <div className="mt-2 text-xs font-semibold truncate">{o.nombre}</div>
-                  <div className="font-display text-lg text-[var(--gold)]">{fmtCOP(o.precio)}</div>
+                  <div className="mt-2 text-xs font-semibold truncate text-[var(--ink)]">{o.nombre}</div>
+                  <div className="font-display text-lg text-[var(--gold-dark)]">{fmtCOP(o.precio)}</div>
                 </a>
               ))}
             </div>
@@ -245,20 +288,26 @@ function PublicIndex() {
       )}
 
       {/* SERVICIOS */}
-      <section id="servicios" className="bg-black text-white py-20 px-4">
+      <section id="servicios" className="bg-white py-20 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          <h2 className="font-display text-5xl text-center text-[var(--gold)] mb-12">CÓMO COMPRAMOS</h2>
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="text-center mb-12">
+            <span className="zi-chip">Servicios</span>
+            <h2 className="font-display text-5xl mt-4 text-[var(--ink)]">Cómo compramos</h2>
+            <p className="mt-3 text-gray-500">Más formas de llevarte tu Apple favorito.</p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              ["💳","Pago a Crédito","Lleva tu iPhone hoy y págalo en cuotas cómodas."],
-              ["🔄","Tu Cel como Pago","Recibimos tu celular como parte de pago. Cotiza sin compromiso."],
-              ["📦","Domicilio","Envíos a toda Barranquilla y Colombia por WhatsApp."],
-              ["✅","Garantía","Todos nuestros productos tienen garantía. Respaldamos cada venta."],
-            ].map(([icon,t,d]) => (
-              <div key={t} className="bg-white/5 border border-[var(--gold)]/20 rounded-xl p-6 hover:border-[var(--gold)] transition">
-                <div className="text-4xl">{icon}</div>
-                <h3 className="font-display text-2xl mt-3 text-[var(--gold)]">{t}</h3>
-                <p className="text-sm text-gray-300 mt-2">{d}</p>
+              { Icon: CreditCard, t: "Pago a crédito", d: "Lleva tu iPhone hoy y págalo en cuotas cómodas." },
+              { Icon: Smartphone, t: "Tu cel como pago", d: "Recibimos tu celular como parte de pago. Cotiza sin compromiso." },
+              { Icon: Truck, t: "Domicilio", d: "Envíos a toda Barranquilla y Colombia por WhatsApp." },
+              { Icon: ShieldCheck, t: "Garantía", d: "Todos nuestros productos tienen garantía respaldada." },
+            ].map(({ Icon, t, d }) => (
+              <div key={t} className="group bg-white border border-[var(--line)] rounded-2xl p-6 hover:border-[var(--gold)] hover:shadow-soft transition">
+                <div className="w-12 h-12 rounded-xl bg-[var(--cream)] flex items-center justify-center group-hover:bg-[var(--gold)] transition">
+                  <Icon className="w-5 h-5 text-[var(--gold-dark)] group-hover:text-[var(--ink)] transition" />
+                </div>
+                <h3 className="font-display text-2xl mt-4 text-[var(--ink)]">{t}</h3>
+                <p className="text-sm text-gray-500 mt-2 leading-relaxed">{d}</p>
               </div>
             ))}
           </div>
@@ -266,146 +315,167 @@ function PublicIndex() {
       </section>
 
       {/* MISION */}
-      <section className="relative bg-[#0A0A0A] text-white py-20 px-4 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,oklch(0.3_0.1_85_/_0.3),transparent_60%)]" />
+      <section className="relative bg-gradient-to-b from-[var(--cream)] to-white py-20 px-4 overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-[var(--gold)]/10 blur-3xl" />
         <div className="relative max-w-3xl mx-auto text-center">
-          <div className="flex items-center justify-center gap-4">
-            <img src={cfg.logoUrl} alt="" className="w-14 h-14" />
-            <div className="w-px h-12 bg-[var(--gold)]/40" />
-            <div className="font-display text-2xl text-[var(--gold)]">{cfg.slogan}</div>
+          <Star className="w-8 h-8 text-[var(--gold)] mx-auto" />
+          <p className="mt-6 font-display text-3xl md:text-4xl text-[var(--ink)] leading-snug">"{cfg.misionQuote}"</p>
+          <div className="mt-7 inline-flex items-center gap-3">
+            <div className="h-px w-12 bg-[var(--gold)]" />
+            <span className="text-[11px] uppercase tracking-[0.3em] text-[var(--gold-dark)] font-bold">{cfg.slogan}</span>
+            <div className="h-px w-12 bg-[var(--gold)]" />
           </div>
-          <p className="mt-8 text-lg italic text-gray-300">"{cfg.misionQuote}"</p>
-          <div className="mt-6 inline-block px-5 py-2 rounded-full border border-[var(--gold)] text-[var(--gold)] text-xs font-bold tracking-wider">{cfg.misionBadge}</div>
         </div>
       </section>
 
       {/* TECNICO */}
-      <section id="servicio-tecnico" className="bg-gray-100 py-20 px-4 border-t-4 border-[var(--gold)]">
+      <section id="servicio-tecnico" className="bg-white py-20 px-4 sm:px-6 border-t border-[var(--line)]">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-10 items-center">
           <div>
-            <h2 className="font-display text-5xl">SERVICIO TÉCNICO para tu <span className="text-[var(--gold-dark)]">iPhone</span></h2>
-            <p className="mt-4 text-gray-700">Reparamos tu equipo Apple con repuestos de calidad y garantía.</p>
-            <ul className="mt-6 space-y-2">
-              {["Cambio de pantalla iPhone","Reparación de batería","Diagnóstico gratuito","Reparación de cámara","Problemas de software / iCloud","Garantía en reparaciones"].map(t => (
-                <li key={t} className="flex gap-2 text-sm"><span className="text-[var(--gold-dark)] font-bold">✓</span>{t}</li>
+            <span className="zi-chip"><Wrench className="w-3 h-3" /> Servicio técnico</span>
+            <h2 className="font-display text-5xl mt-4 text-[var(--ink)]">Reparamos tu <span className="text-[var(--gold-dark)]">iPhone</span></h2>
+            <p className="mt-4 text-gray-600">Equipos Apple atendidos con repuestos de calidad y garantía real.</p>
+            <ul className="mt-6 grid sm:grid-cols-2 gap-2.5">
+              {["Cambio de pantalla","Reparación de batería","Diagnóstico gratuito","Reparación de cámara","iCloud / software","Garantía en reparaciones"].map(t => (
+                <li key={t} className="flex gap-2 text-sm text-gray-700"><span className="text-[var(--gold-dark)] font-bold">✓</span>{t}</li>
               ))}
             </ul>
-            <a href={cfg.techWhatsapp} target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-md bg-[#25D366] text-white font-bold text-sm">
+            <a href={cfg.techWhatsapp} target="_blank" rel="noreferrer" className="mt-7 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#25D366] text-white font-bold text-sm hover:bg-[#1FB855] transition shadow-md">
               <MessageCircle className="w-4 h-4" /> Cotizar por WhatsApp
             </a>
           </div>
-          <div className="bg-[#0A0A0A] text-white rounded-2xl p-10 text-center border border-[var(--gold)]/30">
-            <Wrench className="w-20 h-20 text-[var(--gold)] mx-auto" />
-            <h3 className="font-display text-3xl mt-4 text-[var(--gold)]">SERVICIO TÉCNICO</h3>
-            <p className="text-sm text-gray-400 mt-2">Diagnóstico, reparación y garantía</p>
+          <div className="relative bg-gradient-to-br from-[var(--cream)] via-white to-[var(--cream)] rounded-3xl p-10 text-center border border-[var(--line)] shadow-soft">
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-2xl bg-[var(--ink)] flex items-center justify-center shadow-lg">
+              <Wrench className="w-5 h-5 text-[var(--gold)]" />
+            </div>
+            <h3 className="font-display text-3xl mt-6 text-[var(--ink)]">Servicio técnico</h3>
+            <p className="text-sm text-gray-500 mt-2">Diagnóstico · Reparación · Garantía</p>
+            <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+              {[["30d","Garantía"],["24h","Diagnóstico"],["100%","Original"]].map(([n,l]) => (
+                <div key={l} className="bg-white border border-[var(--line)] rounded-xl py-3">
+                  <div className="font-display text-2xl text-[var(--gold-dark)]">{n}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">{l}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* UBICACION */}
-      <section id="ubicacion" className="bg-black text-white py-20 px-4">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-10">
+      <section id="ubicacion" className="bg-[var(--mist)] py-20 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-8">
           <div>
-            <h2 className="font-display text-5xl text-[var(--gold)]">{cfg.storeName}</h2>
+            <span className="zi-chip"><MapPin className="w-3 h-3" /> Visítanos</span>
+            <h2 className="font-display text-5xl mt-4 text-[var(--ink)]">{cfg.storeName}</h2>
             <div className="mt-6 space-y-3 text-sm">
-              <p className="flex gap-2"><MapPin className="w-4 h-4 text-[var(--gold)]" /> {cfg.direccion}</p>
-              <p className="flex gap-2"><MessageCircle className="w-4 h-4 text-[var(--gold)]" /> +{cfg.whatsapp.slice(0,2)} {cfg.whatsapp.slice(2)}</p>
-              <p className="flex gap-2"><Instagram className="w-4 h-4 text-[var(--gold)]" /> @zona.iphonebq</p>
-              <p className="flex gap-2"><Facebook className="w-4 h-4 text-[var(--gold)]" /> zona.iphonebq</p>
-              <p className="flex gap-2"><Clock className="w-4 h-4 text-[var(--gold)]" /> {cfg.horario}</p>
+              <p className="flex gap-3 text-gray-700"><MapPin className="w-4 h-4 text-[var(--gold-dark)] shrink-0 mt-0.5" /> {cfg.direccion}</p>
+              <p className="flex gap-3 text-gray-700"><MessageCircle className="w-4 h-4 text-[var(--gold-dark)] shrink-0 mt-0.5" /> +{cfg.whatsapp.slice(0,2)} {cfg.whatsapp.slice(2)}</p>
+              <p className="flex gap-3 text-gray-700"><Instagram className="w-4 h-4 text-[var(--gold-dark)] shrink-0 mt-0.5" /> @zona.iphonebq</p>
+              <p className="flex gap-3 text-gray-700"><Facebook className="w-4 h-4 text-[var(--gold-dark)] shrink-0 mt-0.5" /> zona.iphonebq</p>
+              <p className="flex gap-3 text-gray-700"><Clock className="w-4 h-4 text-[var(--gold-dark)] shrink-0 mt-0.5" /> {cfg.horario}</p>
             </div>
-            <a href={cfg.mapsLink} target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-md bg-gradient-to-br from-[var(--gold-light)] via-[var(--gold)] to-[var(--gold-dark)] text-black font-bold text-sm uppercase">
+            <a href={cfg.mapsLink} target="_blank" rel="noreferrer" className="mt-7 zi-btn-gold inline-flex items-center gap-2 text-sm">
               <MapPin className="w-4 h-4" /> Cómo llegar
             </a>
           </div>
-          <iframe src={cfg.mapsEmbed} className="w-full h-72 md:h-full rounded-2xl border border-[var(--gold)]/30" loading="lazy" />
+          <iframe src={cfg.mapsEmbed} className="w-full h-72 md:h-full rounded-2xl border border-[var(--line)] shadow-soft" loading="lazy" />
         </div>
       </section>
 
       {/* FOOTER */}
-      <footer className="bg-[#050505] text-white py-12 px-4 border-t border-[var(--gold)]/20">
+      <footer className="bg-white border-t border-[var(--line)] py-12 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
           <div>
-            <div className="flex items-center gap-2"><img src={cfg.logoUrl} alt="" className="w-10 h-10" /><span className="font-display text-2xl">{cfg.storeName}</span></div>
-            <p className="text-xs text-gray-400 mt-2">Celulares y Accesorios · Barranquilla</p>
+            <div className="flex items-center gap-2.5">
+              <img src={cfg.logoUrl} alt="" className="w-11 h-11 rounded-lg" />
+              <span className="font-display text-2xl text-[var(--ink)]">{cfg.storeName}</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-3 leading-relaxed">Tu tienda Apple en Barranquilla. Productos originales, garantía local, atención humana.</p>
           </div>
           <div className="text-sm">
-            <div className="font-bold text-[var(--gold)] mb-2 text-xs uppercase tracking-widest">Navegación</div>
-            <div className="flex flex-col gap-1 text-gray-400 text-xs">
-              <a href="#catalogo">Catálogo</a><a href="#servicios">Servicios</a><a href="#servicio-tecnico">Técnico</a><a href="#ubicacion">Ubicación</a>
+            <div className="font-bold text-[var(--ink)] mb-3 text-[11px] uppercase tracking-[0.18em]">Navegación</div>
+            <div className="flex flex-col gap-2 text-gray-500 text-xs">
+              <a href="#catalogo" className="hover:text-[var(--gold-dark)]">Catálogo</a>
+              <a href="#servicios" className="hover:text-[var(--gold-dark)]">Servicios</a>
+              <a href="#servicio-tecnico" className="hover:text-[var(--gold-dark)]">Servicio técnico</a>
+              <a href="#ubicacion" className="hover:text-[var(--gold-dark)]">Ubicación</a>
             </div>
           </div>
           <div className="text-sm">
-            <div className="font-bold text-[var(--gold)] mb-2 text-xs uppercase tracking-widest">Síguenos</div>
-            <div className="flex flex-col gap-1 text-gray-400 text-xs">
-              <a href={cfg.instagram} target="_blank" rel="noreferrer">📸 @zona.iphonebq</a>
-              <a href={cfg.facebook} target="_blank" rel="noreferrer">👤 zona.iphonebq</a>
-              <p>📍 {cfg.direccion}</p>
+            <div className="font-bold text-[var(--ink)] mb-3 text-[11px] uppercase tracking-[0.18em]">Síguenos</div>
+            <div className="flex flex-col gap-2 text-gray-500 text-xs">
+              <a href={cfg.instagram} target="_blank" rel="noreferrer" className="hover:text-[var(--gold-dark)] flex items-center gap-2"><Instagram className="w-3.5 h-3.5" /> @zona.iphonebq</a>
+              <a href={cfg.facebook} target="_blank" rel="noreferrer" className="hover:text-[var(--gold-dark)] flex items-center gap-2"><Facebook className="w-3.5 h-3.5" /> zona.iphonebq</a>
+              <p className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" /> {cfg.direccion}</p>
             </div>
           </div>
         </div>
-        <div className="border-t border-white/10 mt-8 pt-4 text-center text-[11px] text-gray-500">
-          © 2025 {cfg.storeName} – Todos los derechos reservados · Barranquilla, Colombia
+        <div className="border-t border-[var(--line)] mt-10 pt-5 text-center text-[11px] text-gray-400">
+          © 2025 {cfg.storeName} · Todos los derechos reservados · Barranquilla, Colombia
         </div>
       </footer>
 
-      {/* QUOTE MODAL */}
       {quote && <QuoteModal data={quote} cfg={cfg} onClose={() => setQuote(null)} />}
     </div>
   );
 }
 
-function SocialIcon({ href, children, hoverColor }: { href: string; children: React.ReactNode; hoverColor?: string }) {
+function SocialIcon({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a href={href} target="_blank" rel="noreferrer"
-       className="w-8 h-8 rounded-md border border-white/15 text-white/70 flex items-center justify-center hover:border-[var(--gold)] hover:text-[var(--gold)] transition"
-       style={hoverColor ? { ["--hover" as never]: hoverColor } : undefined}>
+       className="w-9 h-9 rounded-lg border border-[var(--line)] text-gray-500 flex items-center justify-center hover:border-[var(--gold)] hover:text-[var(--gold-dark)] hover:bg-[var(--cream)] transition">
       {children}
     </a>
   );
 }
 
-function ProductCard({ p, cfg, onQuote, promoId, promoPrice }: { p: Producto; cfg: ReturnType<typeof useConfig>[0]; onQuote: (c?: ColorOpt) => void; promoId: string; promoPrice: number }) {
+const BADGE_CLR: Record<string, string> = {
+  nuevo: "bg-[var(--ink)] text-white",
+  usado: "bg-gray-100 text-gray-700 border border-gray-200",
+  promocion: "bg-[var(--gold)] text-[var(--ink)]",
+  descuento: "bg-red-600 text-white",
+  personalizado: "bg-violet-600 text-white",
+};
+
+function ProductCard({ p, onQuote, promoId, promoPrice }: { p: Producto; onQuote: (c?: ColorOpt) => void; promoId: string; promoPrice: number }) {
   const [color, setColor] = useState<ColorOpt | undefined>(p.colores?.[0]);
   const isPromo = p.id === promoId;
   const displayPrice = isPromo ? promoPrice : p.precio;
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-[var(--gold)] hover:shadow-lg transition group">
-      <div className="relative aspect-square bg-gray-50 flex items-center justify-center p-4">
-        {p.imagen ? <img src={p.imagen} alt={p.nombre} className="max-h-full object-contain" /> : <div className="text-5xl">📱</div>}
-        <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${BADGE_CLR[p.estado]}`}>{p.estado}</span>
-        {isPromo && <span className="absolute top-2 right-2 px-2 py-0.5 rounded bg-[var(--gold)] text-black text-[9px] font-bold">PROMO</span>}
+    <div className="group bg-white border border-[var(--line)] rounded-2xl overflow-hidden hover:border-[var(--gold)] hover:shadow-soft hover:-translate-y-1 transition-all duration-300">
+      <div className="relative aspect-square bg-[var(--mist)] flex items-center justify-center p-5 overflow-hidden">
+        {p.imagen
+          ? <img src={p.imagen} alt={p.nombre} className="max-h-full object-contain group-hover:scale-105 transition duration-500" />
+          : <Smartphone className="w-16 h-16 text-gray-300" />}
+        <span className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-[0.1em] ${BADGE_CLR[p.estado]}`}>{p.estado}</span>
+        {isPromo && <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md bg-red-600 text-white text-[9px] font-bold animate-pulse">PROMO</span>}
       </div>
-      <div className="p-3">
-        <h3 className="font-semibold text-sm truncate">{p.nombre}</h3>
-        <p className="text-xs text-gray-500 truncate">{p.descripcion}</p>
+      <div className="p-4">
+        <h3 className="font-bold text-sm truncate text-[var(--ink)]">{p.nombre}</h3>
+        <p className="text-xs text-gray-500 truncate mt-0.5">{p.descripcion || p.categoria}</p>
         {p.colores && p.colores.length > 0 && (
-          <div className="flex gap-1.5 mt-2">
+          <div className="flex gap-1.5 mt-2.5">
             {p.colores.map(c => (
               <button key={c.hex} onClick={() => setColor(c)} title={c.nombre}
-                      className={`w-4 h-4 rounded-full border ${color?.hex===c.hex ? "ring-2 ring-[var(--gold)]" : "border-gray-300"}`}
+                      className={`w-4 h-4 rounded-full border transition ${color?.hex===c.hex ? "ring-2 ring-offset-1 ring-[var(--gold)] border-white" : "border-gray-300 hover:scale-110"}`}
                       style={{ background: c.hex }} />
             ))}
           </div>
         )}
-        <div className="mt-2 flex items-end justify-between">
-          <div className="font-display text-2xl">{fmtCOP(displayPrice)}</div>
+        <div className="mt-3 flex items-end justify-between">
+          <div>
+            {isPromo && <div className="text-xs text-gray-400 line-through">{fmtCOP(p.precio)}</div>}
+            <div className="font-display text-2xl text-[var(--ink)] leading-none">{fmtCOP(displayPrice)}</div>
+          </div>
         </div>
-        <button onClick={() => onQuote(color)} className="mt-2 w-full py-2 bg-black text-white rounded text-xs font-bold uppercase tracking-wider hover:bg-[var(--gold)] hover:text-black transition">
-          💬 Cotizar
+        <button onClick={() => onQuote(color)} className="mt-3 w-full py-2.5 bg-[var(--ink)] text-white rounded-xl text-[11px] font-bold uppercase tracking-[0.1em] hover:bg-[var(--gold)] hover:text-[var(--ink)] transition flex items-center justify-center gap-1.5">
+          <MessageCircle className="w-3.5 h-3.5" /> Cotizar
         </button>
       </div>
     </div>
   );
 }
-
-const BADGE_CLR: Record<string, string> = {
-  nuevo: "bg-black text-[var(--gold)]",
-  usado: "bg-[#5A4E3A] text-[var(--gold-light)]",
-  promocion: "bg-[var(--gold)] text-black",
-  descuento: "bg-[#C41E3A] text-white",
-  personalizado: "bg-[#7C3AED] text-white",
-};
 
 function QuoteModal({ data, cfg, onClose }: { data: { p: Producto; color?: ColorOpt }; cfg: ReturnType<typeof useConfig>[0]; onClose: () => void }) {
   const [nombre, setNombre] = useState("");
@@ -427,30 +497,31 @@ function QuoteModal({ data, cfg, onClose }: { data: { p: Producto; color?: Color
     onClose();
   };
   return (
-    <div className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[90] bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-up" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[var(--line)]" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="font-display text-2xl">{data.p.nombre}</h3>
+            <span className="zi-chip">Cotizar</span>
+            <h3 className="font-display text-2xl mt-2 text-[var(--ink)]">{data.p.nombre}</h3>
             <div className="font-display text-3xl text-[var(--gold-dark)]">{fmtCOP(data.p.precio)}</div>
           </div>
-          <button onClick={onClose}><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="w-9 h-9 rounded-full hover:bg-[var(--mist)] flex items-center justify-center text-gray-500"><X className="w-5 h-5" /></button>
         </div>
-        <div className="mt-4 space-y-3">
-          <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Tu nombre" className="w-full px-3 py-2 border rounded-lg text-sm" />
-          <input value={tel} onChange={e => setTel(e.target.value.replace(/\D/g,""))} placeholder="WhatsApp (solo números)" className="w-full px-3 py-2 border rounded-lg text-sm" />
+        <div className="mt-5 space-y-3">
+          <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Tu nombre" className="w-full px-3 py-2.5 border border-[var(--line)] rounded-xl text-sm focus:border-[var(--gold)] focus:ring-2 focus:ring-[var(--gold)]/20 outline-none" />
+          <input value={tel} onChange={e => setTel(e.target.value.replace(/\D/g,""))} placeholder="WhatsApp (solo números)" className="w-full px-3 py-2.5 border border-[var(--line)] rounded-xl text-sm focus:border-[var(--gold)] focus:ring-2 focus:ring-[var(--gold)]/20 outline-none" />
           {data.p.colores && data.p.colores.length > 0 && (
-            <select value={color} onChange={e => setColor(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm">
+            <select value={color} onChange={e => setColor(e.target.value)} className="w-full px-3 py-2.5 border border-[var(--line)] rounded-xl text-sm bg-white">
               {data.p.colores.map(c => <option key={c.hex} value={c.nombre}>{c.nombre}</option>)}
             </select>
           )}
           <div className="grid grid-cols-3 gap-2">
             {[["contado","Contado"],["credito","Crédito"],["tradein","Mi cel"]].map(([v,l]) => (
-              <button key={v} onClick={() => setPago(v)} className={`py-2 rounded-lg text-xs font-semibold ${pago===v ? "bg-black text-[var(--gold)]" : "bg-gray-100 text-gray-700"}`}>{l}</button>
+              <button key={v} onClick={() => setPago(v)} className={`py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition ${pago===v ? "bg-[var(--ink)] text-white" : "bg-[var(--mist)] text-gray-600 hover:bg-[var(--cream)]"}`}>{l}</button>
             ))}
           </div>
-          <textarea value={obs} onChange={e => setObs(e.target.value)} placeholder="Mensaje / observaciones" rows={3} className="w-full px-3 py-2 border rounded-lg text-sm" />
-          <button onClick={send} className="w-full py-3 bg-[#25D366] text-white rounded-lg font-bold flex items-center justify-center gap-2">
+          <textarea value={obs} onChange={e => setObs(e.target.value)} placeholder="Mensaje / observaciones" rows={3} className="w-full px-3 py-2.5 border border-[var(--line)] rounded-xl text-sm focus:border-[var(--gold)] focus:ring-2 focus:ring-[var(--gold)]/20 outline-none" />
+          <button onClick={send} className="w-full py-3.5 bg-[#25D366] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#1FB855] transition shadow-md">
             <MessageCircle className="w-4 h-4" /> Enviar por WhatsApp
           </button>
         </div>
