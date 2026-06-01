@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { useVentas, useGastos, useConfig, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, fmtDateTime, rangeFor, type Periodo, maskCedula } from "@/lib/zi/format";
-import { generarFacturaPDF } from "@/lib/zi/pdf";
+import { generarFacturaPDF, exportarHistorialPDF } from "@/lib/zi/pdf";
 import { Card, Btn, Input, Select, Tabs, Field, Modal, Stat } from "./ui";
-import { Trash2, Printer, MessageCircle } from "lucide-react";
+import { Trash2, Printer, MessageCircle, Download } from "lucide-react";
 import type { Venta, Gasto } from "@/lib/zi/types";
 
 export function Finanzas() {
