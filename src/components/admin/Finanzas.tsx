@@ -61,10 +61,10 @@ function Historial() {
             <option value="todos">Todos los locales</option><option value="1">Local 1</option><option value="2">Local 2</option>
           </Select>
           {(["hoy","mes","todos"] as Periodo[]).map(p =>
-            <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1.5 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-white/10 text-gray-400"}`}>{p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : "Todos"}</button>
+            <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1.5 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>{p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : "Todos"}</button>
           )}
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-black/40 border border-white/10 rounded text-xs text-white" />
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-black/40 border border-white/10 rounded text-xs text-white" />
+          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
+          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por # o cliente" className="w-auto flex-1 min-w-[180px]" />
         </div>
       </Card>
@@ -73,12 +73,12 @@ function Historial() {
         {list.length === 0 ? <p className="text-sm text-gray-500">Sin ventas en el período.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-[10px] text-gray-500 uppercase border-b border-white/10">
+              <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
                 <tr><th className="text-left py-2">Factura</th><th className="text-left">Fecha</th><th className="text-left">Cliente</th><th className="text-right">Total</th><th>Pago</th><th>Asesor</th><th></th></tr>
               </thead>
               <tbody>
                 {list.map(v => (
-                  <tr key={v.id} className="border-b border-white/5 hover:bg-white/5 cursor-pointer" onClick={() => setDetail(v)}>
+                  <tr key={v.id} className="border-b border-[var(--line)] hover:bg-[var(--mist)] cursor-pointer" onClick={() => setDetail(v)}>
                     <td className="py-2 text-[var(--gold)] font-semibold">{v.factura}</td>
                     <td className="text-xs text-gray-400">{fmtDate(v.fecha)}</td>
                     <td className="text-xs">{v.cliente?.nombre || "—"}</td>
@@ -87,7 +87,7 @@ function Historial() {
                     <td className="text-xs">{v.asesor || "—"}</td>
                     <td className="text-right" onClick={e => e.stopPropagation()}>
                       <button title="Reimprimir" className="text-[var(--gold)] px-2" onClick={() => generarFacturaPDF(v, cfg)}><Printer className="w-4 h-4" /></button>
-                      <button title="Cancelar" className="text-red-400 px-2" onClick={() => setPinModal(v)}><Trash2 className="w-4 h-4" /></button>
+                      <button title="Cancelar" className="text-red-600 px-2" onClick={() => setPinModal(v)}><Trash2 className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -103,7 +103,7 @@ function Historial() {
             <div className="text-xs text-gray-400">{fmtDateTime(detail.fecha)}</div>
             <div className="space-y-1.5">
               {detail.productos.map((p, i) => (
-                <div key={i} className="flex justify-between border-b border-white/5 py-1.5">
+                <div key={i} className="flex justify-between border-b border-[var(--line)] py-1.5">
                   <span>{p.cantidad} × {p.nombre}</span>
                   <span className="text-[var(--gold)]">{fmtCOP(p.subtotal)}</span>
                 </div>
@@ -112,27 +112,27 @@ function Historial() {
             <div className="flex justify-between text-base font-bold pt-2"><span>Total</span><span className="text-[var(--gold)] font-display text-2xl">{fmtCOP(detail.total)}</span></div>
             <div className="text-xs text-gray-400">Pago: <b className="text-white">{detail.tipo}</b> {detail.metodoPago && `(${detail.metodoPago})`}</div>
             {detail.cliente && (
-              <div className="bg-white/5 rounded-lg p-3 space-y-1 text-xs">
+              <div className="bg-[var(--mist)] rounded-lg p-3 space-y-1 text-xs">
                 <div>👤 {detail.cliente.nombre}</div>
                 {detail.cliente.cedula && <div>📄 {maskCedula(detail.cliente.cedula)}</div>}
                 {detail.cliente.telefono && <div>📞 {detail.cliente.telefono}</div>}
               </div>
             )}
             {detail.tradeIn && (
-              <div className="bg-white/5 rounded-lg p-3 text-xs space-y-1">
+              <div className="bg-[var(--mist)] rounded-lg p-3 text-xs space-y-1">
                 <div>📱 Recibido: {detail.tradeIn.marca} {detail.tradeIn.modelo}</div>
                 <div>💰 Valor: {fmtCOP(detail.tradeIn.valor)} · Restante: {fmtCOP(detail.tradeIn.restante)} ({detail.tradeIn.metodoRestante})</div>
               </div>
             )}
             {detail.creditoCuotas && (
-              <div className="bg-white/5 rounded-lg p-3 text-xs space-y-1">
+              <div className="bg-[var(--mist)] rounded-lg p-3 text-xs space-y-1">
                 <div>💳 Cuota inicial: {fmtCOP(detail.creditoCuotaInicial || 0)}</div>
                 <div>📅 {detail.creditoCuotas} cuotas de {fmtCOP(detail.creditoValorCuota || 0)}</div>
               </div>
             )}
             {detail.observaciones && <div className="text-xs text-gray-400">📝 {detail.observaciones}</div>}
             {detail.asesor && <div className="text-xs">Atendió: <b>{detail.asesor}</b></div>}
-            <div className="flex gap-2 pt-3 border-t border-white/10">
+            <div className="flex gap-2 pt-3 border-t border-[var(--line)]">
               <Btn variant="danger" onClick={() => setPinModal(detail)}><Trash2 className="inline w-3 h-3" /> Cancelar</Btn>
               {detail.cliente?.telefono &&
                 <Btn variant="ok" onClick={() => window.open(`https://wa.me/${detail.cliente!.telefono}?text=${encodeURIComponent(`Hola ${detail.cliente!.nombre}, te confirmamos tu compra ${detail.factura} por ${fmtCOP(detail.total)}`)}`)}>
@@ -145,11 +145,11 @@ function Historial() {
       </Modal>
 
       <Modal open={!!pinModal} onClose={() => { setPinModal(null); setPin(""); setPinErr(""); }} title="Cancelar venta" size="sm">
-        <p className="text-sm text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 rounded p-3 mb-3">
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3 mb-3">
           ⚠️ La venta se eliminará de los resultados activos y se descontará de las ganancias. Quedará registrada en canceladas.
         </p>
         <Field label="PIN de cancelación"><Input type="password" maxLength={4} value={pin} onChange={e => { setPin(e.target.value); setPinErr(""); }} /></Field>
-        {pinErr && <div className="text-red-400 text-sm mt-2">{pinErr}</div>}
+        {pinErr && <div className="text-red-600 text-sm mt-2">{pinErr}</div>}
         <div className="flex gap-2 mt-4">
           <Btn variant="danger" onClick={confirmCancel} className="flex-1">Confirmar cancelación</Btn>
           <Btn variant="ghost" onClick={() => setPinModal(null)} className="flex-1">Volver</Btn>
@@ -176,18 +176,18 @@ function Canceladas() {
         </div>
         {cancel.length === 0 ? <p className="text-sm text-gray-500">No hay ventas canceladas.</p> : (
           <table className="w-full text-sm">
-            <thead className="text-[10px] text-gray-500 uppercase border-b border-white/10">
+            <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
               <tr><th className="text-left py-2">Factura</th><th className="text-left">Fecha</th><th className="text-left">Cliente</th><th className="text-right">Total</th><th></th><th></th></tr>
             </thead>
             <tbody>
               {cancel.map(v => (
-                <tr key={v.id} className="border-b border-white/5">
+                <tr key={v.id} className="border-b border-[var(--line)]">
                   <td className="py-2 text-[var(--gold)]">{v.factura}</td>
                   <td className="text-xs text-gray-400">{fmtDate(v.fecha)}</td>
                   <td className="text-xs">{v.cliente?.nombre || "—"}</td>
                   <td className="text-right line-through text-gray-500">{fmtCOP(v.total)}</td>
-                  <td><span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[10px] rounded font-bold">CANCELADA</span></td>
-                  <td className="text-right"><button onClick={() => setVentas(prev => prev.filter(x => x.id !== v.id))} className="text-red-400 px-2"><Trash2 className="w-4 h-4" /></button></td>
+                  <td><span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] rounded font-bold">CANCELADA</span></td>
+                  <td className="text-right"><button onClick={() => setVentas(prev => prev.filter(x => x.id !== v.id))} className="text-red-600 px-2"><Trash2 className="w-4 h-4" /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -223,8 +223,8 @@ function Gastos() {
 
   return (
     <div className="space-y-4">
-      <Card className="bg-yellow-500/5 border-yellow-500/30">
-        <div className="text-sm text-yellow-200">
+      <Card className="bg-amber-50 border-amber-200">
+        <div className="text-sm text-amber-800">
           <b>¿Qué registrar aquí?</b> Solo gastos operativos: arriendo del local, servicios (luz, internet), transportes, publicidad, suministros.<br />
           <b>NO registres aquí la compra de inventario:</b> eso ya se descuenta automáticamente cuando vendes un producto.
         </div>
@@ -253,27 +253,27 @@ function Gastos() {
       <Card>
         <div className="flex flex-wrap gap-2 mb-3 items-center">
           {(["hoy","mes","anio","todos"] as Periodo[]).map(p =>
-            <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-white/10 text-gray-400"}`}>
+            <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>
               {p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : p === "anio" ? "Este año" : "Todos"}
             </button>
           )}
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-black/40 border border-white/10 rounded text-xs text-white" />
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-black/40 border border-white/10 rounded text-xs text-white" />
+          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
+          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
         </div>
         <table className="w-full text-sm">
-          <thead className="text-[10px] text-gray-500 uppercase border-b border-white/10">
+          <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
             <tr><th className="text-left py-2">Descripción</th><th>Categoría</th><th>Local</th><th className="text-right">Monto</th><th>Fecha</th><th></th></tr>
           </thead>
           <tbody>
             {list.length === 0 ? <tr><td colSpan={6} className="text-center text-gray-500 py-4">Sin gastos.</td></tr> :
               list.map(g => (
-                <tr key={g.id} className="border-b border-white/5">
+                <tr key={g.id} className="border-b border-[var(--line)]">
                   <td className="py-2">{g.descripcion}</td>
                   <td className="text-xs text-gray-400">{g.categoria}</td>
                   <td className="text-xs">L{g.local}</td>
-                  <td className="text-right text-red-400">{fmtCOP(g.monto)}</td>
+                  <td className="text-right text-red-600">{fmtCOP(g.monto)}</td>
                   <td className="text-xs text-gray-400">{fmtDate(g.fecha)}</td>
-                  <td className="text-right"><button onClick={() => setGastos(prev => prev.filter(x => x.id !== g.id))} className="text-red-400"><Trash2 className="w-4 h-4" /></button></td>
+                  <td className="text-right"><button onClick={() => setGastos(prev => prev.filter(x => x.id !== g.id))} className="text-red-600"><Trash2 className="w-4 h-4" /></button></td>
                 </tr>
               ))}
           </tbody>

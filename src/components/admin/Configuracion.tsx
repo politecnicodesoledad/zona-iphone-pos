@@ -75,13 +75,13 @@ function Ajustes() {
           <Field label="Badge de misión"><Input value={draft.misionBadge} onChange={e => upd("misionBadge", e.target.value)} /></Field>
         </div>
 
-        <div className="mt-5 border-t border-white/10 pt-4">
+        <div className="mt-5 border-t border-[var(--line)] pt-4">
           <div className="text-xs uppercase tracking-widest text-gray-500 mb-2">🧪 Probar factura</div>
           <Btn variant="ghost" onClick={pruebaFactura}>Generar factura de prueba</Btn>
         </div>
 
         <Btn onClick={save} className="w-full mt-5">💾 Guardar configuración</Btn>
-        {saved && <div className="text-green-400 text-center mt-2 text-sm">✓ Guardado</div>}
+        {saved && <div className="text-emerald-600 text-center mt-2 text-sm">✓ Guardado</div>}
       </Card>
     </div>
   );
@@ -148,7 +148,7 @@ function Video() {
         <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." />
       </Field>
       <div className="mt-2">
-        <label className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs cursor-pointer hover:border-[var(--gold)]">
+        <label className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--mist)] border border-[var(--line)] rounded-lg text-xs cursor-pointer hover:border-[var(--gold)]">
           📁 Subir desde galería
           <input type="file" accept="video/*" className="hidden" onChange={e => e.target.files?.[0] && upload(e.target.files[0])} />
         </label>
@@ -156,7 +156,7 @@ function Video() {
       {url && (
         <div className="mt-4">
           <div className="text-xs uppercase text-gray-500 mb-2">Preview</div>
-          <video src={url} controls className="w-full max-w-md rounded-lg border border-white/10" />
+          <video src={url} controls className="w-full max-w-md rounded-lg border border-[var(--line)]" />
         </div>
       )}
       <Btn onClick={save} className="mt-4">💾 Guardar video</Btn>

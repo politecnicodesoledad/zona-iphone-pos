@@ -60,7 +60,7 @@ function CRM() {
       </Card>
 
       {proximos.length > 0 && (
-        <Card className="bg-yellow-500/5 border-yellow-500/30">
+        <Card className="bg-amber-50 border-amber-200">
           <div className="text-xs uppercase tracking-widest text-yellow-300 mb-2">⏰ Próximos vencimientos (7 días)</div>
           <div className="space-y-1 text-sm">
             {proximos.map(c => <div key={c.id} className="flex justify-between"><span>{c.nombre}</span><span className="text-yellow-300">{fmtDate(c.proximoPago)}</span></div>)}
@@ -71,12 +71,12 @@ function CRM() {
       <Card>
         {list.length === 0 ? <p className="text-sm text-gray-500">Sin clientes.</p> : (
           <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase text-gray-500 border-b border-white/10"><tr><th className="text-left py-2">Nombre</th><th>Cédula</th><th>Tel</th><th className="text-right">Total</th><th className="text-right">Saldo</th><th>Cuotas</th><th>Estado</th><th></th></tr></thead>
+            <thead className="text-[10px] uppercase text-gray-500 border-b border-[var(--line)]"><tr><th className="text-left py-2">Nombre</th><th>Cédula</th><th>Tel</th><th className="text-right">Total</th><th className="text-right">Saldo</th><th>Cuotas</th><th>Estado</th><th></th></tr></thead>
             <tbody>
               {list.map(c => {
                 const saldo = c.total - c.cuotaInicial - c.historialAbonos.slice(1).reduce((s, a) => s + a.monto, 0);
                 return (
-                  <tr key={c.id} className="border-b border-white/5">
+                  <tr key={c.id} className="border-b border-[var(--line)]">
                     <td className="py-2">{c.nombre}</td>
                     <td className="text-xs text-gray-400">{maskCedula(c.cedula)}</td>
                     <td className="text-xs">{c.telefono}</td>
@@ -85,9 +85,9 @@ function CRM() {
                     <td className="text-xs">{c.cuotasPagadas}/{c.cuotas}</td>
                     <td><EstadoBadge estado={c.estado} /></td>
                     <td className="text-right">
-                      <button onClick={() => setDetail(c)} className="text-blue-400 px-2"><Eye className="w-4 h-4" /></button>
-                      {c.telefono && <a target="_blank" rel="noreferrer" href={`https://wa.me/${c.telefono}`} className="text-green-400 px-2 inline-block"><MessageCircle className="w-4 h-4" /></a>}
-                      <button onClick={() => { if (confirm("¿Eliminar cliente?")) setClientes(prev => prev.filter(x => x.id !== c.id)); }} className="text-red-400 px-2"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => setDetail(c)} className="text-blue-600 px-2"><Eye className="w-4 h-4" /></button>
+                      {c.telefono && <a target="_blank" rel="noreferrer" href={`https://wa.me/${c.telefono}`} className="text-emerald-600 px-2 inline-block"><MessageCircle className="w-4 h-4" /></a>}
+                      <button onClick={() => { if (confirm("¿Eliminar cliente?")) setClientes(prev => prev.filter(x => x.id !== c.id)); }} className="text-red-600 px-2"><Trash2 className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 );
@@ -109,7 +109,7 @@ function CRM() {
 }
 
 function EstadoBadge({ estado }: { estado: ClienteCRM["estado"] }) {
-  const c = { al_dia: "bg-green-500/20 text-green-400", mora: "bg-red-500/20 text-red-400", pagado: "bg-blue-500/20 text-blue-400", solicitud: "bg-yellow-500/20 text-yellow-400" }[estado];
+  const c = { al_dia: "bg-green-500/20 text-emerald-600", mora: "bg-red-100 text-red-600", pagado: "bg-blue-500/20 text-blue-600", solicitud: "bg-yellow-500/20 text-amber-700" }[estado];
   const l = { al_dia: "✅ Al día", mora: "⚠️ Mora", pagado: "🎉 Pagado", solicitud: "📋 Solicitud" }[estado];
   return <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c}`}>{l}</span>;
 }
@@ -139,12 +139,12 @@ function CRMDetail({ cliente, onUpdate }: { cliente: ClienteCRM; onUpdate: (c: C
         <div><span className="text-gray-500 text-xs">Abono inicial:</span> {fmtCOP(cliente.cuotaInicial)}</div>
         <div><span className="text-gray-500 text-xs">Saldo:</span> <b className="text-yellow-300">{fmtCOP(saldo)}</b></div>
       </div>
-      <h4 className="text-xs uppercase tracking-widest text-gray-500 mt-4 border-b border-white/10 pb-2">Cuotas</h4>
+      <h4 className="text-xs uppercase tracking-widest text-gray-500 mt-4 border-b border-[var(--line)] pb-2">Cuotas</h4>
       <table className="w-full text-xs">
         <thead className="text-gray-500"><tr><th className="text-left">#</th><th className="text-left">Fecha</th><th className="text-right">Monto</th><th>Estado</th><th></th></tr></thead>
         <tbody>
           {cliente.cuotasDetalle.map((c: CuotaCRM, i) => (
-            <tr key={i} className="border-t border-white/5">
+            <tr key={i} className="border-t border-[var(--line)]">
               <td className="py-2">{c.numero}</td>
               <td>{fmtDate(c.fechaPago)}</td>
               <td className="text-right">{fmtCOP(c.monto)}</td>
@@ -154,7 +154,7 @@ function CRMDetail({ cliente, onUpdate }: { cliente: ClienteCRM; onUpdate: (c: C
           ))}
         </tbody>
       </table>
-      <h4 className="text-xs uppercase tracking-widest text-gray-500 mt-4 border-b border-white/10 pb-2">Historial de abonos</h4>
+      <h4 className="text-xs uppercase tracking-widest text-gray-500 mt-4 border-b border-[var(--line)] pb-2">Historial de abonos</h4>
       <ul className="text-xs space-y-1">
         {cliente.historialAbonos.map((a, i) => <li key={i} className="flex justify-between"><span>{fmtDate(a.fecha)} {a.nota && `· ${a.nota}`}</span><span className="text-[var(--gold)]">{fmtCOP(a.monto)}</span></li>)}
       </ul>
@@ -214,18 +214,18 @@ function Proveedores() {
       <Card>
         <div className="flex justify-between mb-3"><h3 className="font-display text-xl text-[var(--gold)]">Proveedores</h3><Btn onClick={() => { setEdit(newP()); setOpen(true); }}><Plus className="inline w-3 h-3" /> Agregar</Btn></div>
         {provs.length === 0 ? <p className="text-sm text-gray-500">Sin proveedores.</p> : (
-          <table className="w-full text-sm"><thead className="text-[10px] uppercase text-gray-500 border-b border-white/10"><tr><th className="text-left py-2">Proveedor</th><th>Tel</th><th>Banco</th><th className="text-right">Deuda</th><th className="text-right">Abonado</th><th className="text-right">Saldo</th><th>Límite</th><th></th></tr></thead>
+          <table className="w-full text-sm"><thead className="text-[10px] uppercase text-gray-500 border-b border-[var(--line)]"><tr><th className="text-left py-2">Proveedor</th><th>Tel</th><th>Banco</th><th className="text-right">Deuda</th><th className="text-right">Abonado</th><th className="text-right">Saldo</th><th>Límite</th><th></th></tr></thead>
             <tbody>
               {provs.map(p => (
-                <tr key={p.id} className="border-b border-white/5">
+                <tr key={p.id} className="border-b border-[var(--line)]">
                   <td className="py-2">{p.nombre}</td><td className="text-xs">{p.telefono}</td><td className="text-xs">{p.banco}</td>
-                  <td className="text-right">{fmtCOP(p.totalDeuda)}</td><td className="text-right text-green-400">{fmtCOP(p.abonado)}</td>
+                  <td className="text-right">{fmtCOP(p.totalDeuda)}</td><td className="text-right text-emerald-600">{fmtCOP(p.abonado)}</td>
                   <td className="text-right text-yellow-300">{fmtCOP(p.totalDeuda - p.abonado)}</td>
                   <td className="text-xs">{fmtDate(p.fechaLimite)}</td>
                   <td className="text-right">
-                    <button onClick={() => { const m = +(prompt("Monto abono:") || 0); if (m) setProvs(prev => prev.map(x => x.id === p.id ? { ...x, abonado: x.abonado + m, historialAbonos: [...x.historialAbonos, { fecha: Date.now(), monto: m }] } : x)); }} className="text-green-400 px-2">+$</button>
-                    <button onClick={() => { setEdit(p); setOpen(true); }} className="text-blue-400 px-2"><Edit className="w-4 h-4" /></button>
-                    <button onClick={() => { if (confirm("¿Eliminar?")) setProvs(prev => prev.filter(x => x.id !== p.id)); }} className="text-red-400 px-2"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => { const m = +(prompt("Monto abono:") || 0); if (m) setProvs(prev => prev.map(x => x.id === p.id ? { ...x, abonado: x.abonado + m, historialAbonos: [...x.historialAbonos, { fecha: Date.now(), monto: m }] } : x)); }} className="text-emerald-600 px-2">+$</button>
+                    <button onClick={() => { setEdit(p); setOpen(true); }} className="text-blue-600 px-2"><Edit className="w-4 h-4" /></button>
+                    <button onClick={() => { if (confirm("¿Eliminar?")) setProvs(prev => prev.filter(x => x.id !== p.id)); }} className="text-red-600 px-2"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}
@@ -288,19 +288,19 @@ function Empleados() {
         <p className="text-xs text-gray-500 mb-3">Cada empleado debe marcarse "Activo hoy" para generar pago diario.</p>
         {emp.length === 0 ? <p className="text-sm text-gray-500">Sin empleados.</p> : (
           <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase text-gray-500 border-b border-white/10"><tr><th className="text-left py-2">Nombre</th><th>Caja</th><th>Tipo</th><th className="text-right">Monto</th><th>Activo</th><th></th></tr></thead>
+            <thead className="text-[10px] uppercase text-gray-500 border-b border-[var(--line)]"><tr><th className="text-left py-2">Nombre</th><th>Caja</th><th>Tipo</th><th className="text-right">Monto</th><th>Activo</th><th></th></tr></thead>
             <tbody>
               {emp.map(e => (
-                <tr key={e.id} className="border-b border-white/5">
+                <tr key={e.id} className="border-b border-[var(--line)]">
                   <td className="py-2">{e.nombre}</td>
                   <td className="text-xs">L{e.local} · {e.local === 1 ? cfg.local1nombre : cfg.local2nombre}</td>
                   <td className="text-xs uppercase">{e.tipoPago}</td>
                   <td className="text-right">{fmtCOP(e.monto)}</td>
-                  <td><button onClick={() => toggle(e)} className={`px-2 py-1 rounded text-[10px] ${e.activoHoy ? "bg-green-500/20 text-green-400" : "bg-white/5 text-gray-400"}`}>{e.activoHoy ? "✓ Activo" : "Inactivo"}</button></td>
+                  <td><button onClick={() => toggle(e)} className={`px-2 py-1 rounded text-[10px] ${e.activoHoy ? "bg-green-500/20 text-emerald-600" : "bg-[var(--mist)] text-gray-400"}`}>{e.activoHoy ? "✓ Activo" : "Inactivo"}</button></td>
                   <td className="text-right">
                     <button onClick={() => setPago({ e })} className="text-[var(--gold)] px-2">💳</button>
-                    <button onClick={() => { setEdit(e); setOpen(true); }} className="text-blue-400 px-2"><Edit className="w-4 h-4" /></button>
-                    <button onClick={() => { if (confirm("¿Eliminar?")) setEmp(prev => prev.filter(x => x.id !== e.id)); }} className="text-red-400 px-2"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => { setEdit(e); setOpen(true); }} className="text-blue-600 px-2"><Edit className="w-4 h-4" /></button>
+                    <button onClick={() => { if (confirm("¿Eliminar?")) setEmp(prev => prev.filter(x => x.id !== e.id)); }} className="text-red-600 px-2"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}

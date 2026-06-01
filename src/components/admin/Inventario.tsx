@@ -79,22 +79,22 @@ function ProductosTab({ modo }: { modo: "productos" | "accesorios" }) {
         {data.length === 0 ? <p className="text-sm text-gray-500">Sin productos.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-[10px] uppercase text-gray-500 border-b border-white/10">
+              <thead className="text-[10px] uppercase text-gray-500 border-b border-[var(--line)]">
                 <tr><th className="text-left py-2">Producto</th><th>Cat</th><th>Estado</th><th className="text-right">Stock</th><th className="text-right">Costo</th><th className="text-right">Precio</th><th className="text-right">Ganancia</th><th></th></tr>
               </thead>
               <tbody>
                 {data.map(p => (
-                  <tr key={p.id} className="border-b border-white/5">
-                    <td className="py-2"><div className="flex items-center gap-2">{p.imagen ? <img src={p.imagen} className="w-8 h-8 object-contain bg-white/5 rounded" /> : <span>📱</span>}<span>{p.nombre}</span></div></td>
+                  <tr key={p.id} className="border-b border-[var(--line)]">
+                    <td className="py-2"><div className="flex items-center gap-2">{p.imagen ? <img src={p.imagen} className="w-8 h-8 object-contain bg-[var(--mist)] rounded" /> : <span>📱</span>}<span>{p.nombre}</span></div></td>
                     <td className="text-xs text-gray-400 uppercase">{p.categoria}</td>
                     <td className="text-xs">{p.estado}</td>
                     <td className="text-right">{p.stock}</td>
                     <td className="text-right text-gray-400">{fmtCOP(p.costo)}</td>
                     <td className="text-right text-[var(--gold)]">{fmtCOP(p.precio)}</td>
-                    <td className="text-right text-green-400">{fmtCOP(p.precio - p.costo)}</td>
+                    <td className="text-right text-emerald-600">{fmtCOP(p.precio - p.costo)}</td>
                     <td className="text-right">
-                      <button onClick={() => { setEditing(p); setOpen(true); }} className="text-blue-400 px-2"><Edit className="w-4 h-4" /></button>
-                      <button onClick={() => { if (confirm("¿Eliminar?")) setData(prev => prev.filter(x => x.id !== p.id)); }} className="text-red-400 px-2"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => { setEditing(p); setOpen(true); }} className="text-blue-600 px-2"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => { if (confirm("¿Eliminar?")) setData(prev => prev.filter(x => x.id !== p.id)); }} className="text-red-600 px-2"><Trash2 className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -125,7 +125,7 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
 
   return (
     <div className="space-y-4">
-      <h4 className="text-xs uppercase tracking-widest text-gray-500 border-b border-white/10 pb-2">Datos básicos</h4>
+      <h4 className="text-xs uppercase tracking-widest text-gray-500 border-b border-[var(--line)] pb-2">Datos básicos</h4>
       <div className="grid md:grid-cols-2 gap-3">
         <Field label="Nombre"><Input value={value.nombre} onChange={e => onChange({ ...value, nombre: e.target.value })} /></Field>
         <Field label="Categoría"><Select value={value.categoria} onChange={e => onChange({ ...value, categoria: e.target.value as Categoria })}>
@@ -147,16 +147,16 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
         <div className="space-y-2">
           {value.colores.map((c, i) => (
             <div key={i} className="flex gap-2 items-center">
-              <input type="color" value={c.hex} onChange={e => updateColor(i, { hex: e.target.value })} className="w-10 h-9 rounded border border-white/10" />
+              <input type="color" value={c.hex} onChange={e => updateColor(i, { hex: e.target.value })} className="w-10 h-9 rounded border border-[var(--line)]" />
               <Input value={c.nombre} onChange={e => updateColor(i, { nombre: e.target.value })} placeholder="Nombre" />
-              <button onClick={() => onChange({ ...value, colores: value.colores.filter((_, idx) => idx !== i) })} className="text-red-400"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => onChange({ ...value, colores: value.colores.filter((_, idx) => idx !== i) })} className="text-red-600"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
           <Btn variant="ghost" onClick={addColor}>+ Agregar color</Btn>
         </div>
       </Field>
 
-      <h4 className="text-xs uppercase tracking-widest text-gray-500 border-b border-white/10 pb-2 mt-4">Info de compra</h4>
+      <h4 className="text-xs uppercase tracking-widest text-gray-500 border-b border-[var(--line)] pb-2 mt-4">Info de compra</h4>
       <div className="grid md:grid-cols-2 gap-3">
         <Field label="Proveedor"><Input value={value.proveedor || ""} onChange={e => onChange({ ...value, proveedor: e.target.value })} /></Field>
         <Field label="Costo de compra"><Input type="number" value={value.costo} onChange={e => onChange({ ...value, costo: +e.target.value || 0 })} /></Field>
@@ -171,12 +171,12 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
         </Field>
       </div>
       {value.costoOrigen === "ganancia_neta" && (
-        <div className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
+        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
           ⚠️ Este costo se registrará en auditoría como `compra_inventario` (no se mezcla con gastos operativos).
         </div>
       )}
 
-      <Card className="bg-[var(--gold)]/5 border-[var(--gold)]/30">
+      <Card className="bg-[var(--cream)] border-[var(--gold)]/40">
         <div className="text-xs text-gray-400 uppercase tracking-widest">Vista previa</div>
         <div className="font-display text-3xl text-[var(--gold)]">{fmtCOP(ganancia)} <span className="text-sm text-gray-500">({margen.toFixed(1)}%)</span></div>
         <div className="text-xs text-gray-500">Ganancia por unidad</div>
@@ -217,7 +217,7 @@ function AnalisisTab() {
           {resumen.map(([k, d]) => (
             <div key={k} className="mb-2">
               <div className="flex justify-between text-xs"><span className="uppercase">{k}</span><span className="text-[var(--gold)]">{fmtCOP(d.costo)}</span></div>
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden mt-1"><div className="h-full bg-[var(--gold)]" style={{ width: `${(d.costo/maxCosto)*100}%` }} /></div>
+              <div className="h-2 bg-[var(--mist)] rounded-full overflow-hidden mt-1"><div className="h-full bg-[var(--gold)]" style={{ width: `${(d.costo/maxCosto)*100}%` }} /></div>
             </div>
           ))}
         </Card>
@@ -229,7 +229,7 @@ function AnalisisTab() {
             </thead>
             <tbody>
               {resumen.map(([k, d]) => (
-                <tr key={k} className="border-t border-white/5"><td className="py-1.5 uppercase">{k}</td><td className="text-right">{d.count}</td><td className="text-right text-gray-400">{fmtCOP(d.costo)}</td><td className="text-right text-green-400">{fmtCOP(d.ganancia)}</td></tr>
+                <tr key={k} className="border-t border-[var(--line)]"><td className="py-1.5 uppercase">{k}</td><td className="text-right">{d.count}</td><td className="text-right text-gray-400">{fmtCOP(d.costo)}</td><td className="text-right text-emerald-600">{fmtCOP(d.ganancia)}</td></tr>
               ))}
             </tbody>
           </table>
@@ -238,10 +238,10 @@ function AnalisisTab() {
       <Card>
         <h3 className="font-display text-xl text-[var(--gold)] mb-3">Productos ({list.length})</h3>
         <table className="w-full text-sm">
-          <thead className="text-[10px] uppercase text-gray-500 border-b border-white/10"><tr><th className="text-left py-2">Nombre</th><th className="text-right">Stock</th><th className="text-right">Costo</th><th className="text-right">Precio</th><th className="text-right">Margen</th></tr></thead>
+          <thead className="text-[10px] uppercase text-gray-500 border-b border-[var(--line)]"><tr><th className="text-left py-2">Nombre</th><th className="text-right">Stock</th><th className="text-right">Costo</th><th className="text-right">Precio</th><th className="text-right">Margen</th></tr></thead>
           <tbody>
             {list.map(p => { const g = p.precio - p.costo; const m = p.precio > 0 ? (g/p.precio)*100 : 0;
-              return <tr key={p.id} className="border-b border-white/5"><td className="py-1.5">{p.nombre}</td><td className="text-right">{p.stock}</td><td className="text-right text-gray-400">{fmtCOP(p.costo)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(p.precio)}</td><td className="text-right text-green-400">{m.toFixed(1)}%</td></tr>;
+              return <tr key={p.id} className="border-b border-[var(--line)]"><td className="py-1.5">{p.nombre}</td><td className="text-right">{p.stock}</td><td className="text-right text-gray-400">{fmtCOP(p.costo)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(p.precio)}</td><td className="text-right text-emerald-600">{m.toFixed(1)}%</td></tr>;
             })}
           </tbody>
         </table>
@@ -285,10 +285,10 @@ function VendidosTab() {
         </div>
         {vendidos.length === 0 ? <p className="text-sm text-gray-500">Sin dispositivos vendidos.</p> : (
           <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase text-gray-500 border-b border-white/10"><tr><th className="text-left py-2">Nombre</th><th>Cat.</th><th className="text-right">Costo</th><th className="text-right">Precio</th><th className="text-right">Ganancia</th><th>Archivo</th><th></th></tr></thead>
+            <thead className="text-[10px] uppercase text-gray-500 border-b border-[var(--line)]"><tr><th className="text-left py-2">Nombre</th><th>Cat.</th><th className="text-right">Costo</th><th className="text-right">Precio</th><th className="text-right">Ganancia</th><th>Archivo</th><th></th></tr></thead>
             <tbody>
               {vendidos.map(v => (
-                <tr key={v.id} className="border-b border-white/5"><td className="py-2">{v.nombre}</td><td className="text-xs uppercase text-gray-400">{v.categoria}</td><td className="text-right text-gray-400">{fmtCOP(v.costo)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(v.precio)}</td><td className="text-right text-green-400">{fmtCOP(v.gananciaPotencial)}</td><td className="text-xs text-gray-400">{fmtDate(v.fechaArchivado)}</td><td className="text-right"><button onClick={() => restaurar(v.id)} className="text-blue-400"><RotateCcw className="w-4 h-4" /></button></td></tr>
+                <tr key={v.id} className="border-b border-[var(--line)]"><td className="py-2">{v.nombre}</td><td className="text-xs uppercase text-gray-400">{v.categoria}</td><td className="text-right text-gray-400">{fmtCOP(v.costo)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(v.precio)}</td><td className="text-right text-emerald-600">{fmtCOP(v.gananciaPotencial)}</td><td className="text-xs text-gray-400">{fmtDate(v.fechaArchivado)}</td><td className="text-right"><button onClick={() => restaurar(v.id)} className="text-blue-600"><RotateCcw className="w-4 h-4" /></button></td></tr>
               ))}
             </tbody>
           </table>

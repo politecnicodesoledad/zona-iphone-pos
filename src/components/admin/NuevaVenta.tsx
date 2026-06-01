@@ -145,9 +145,9 @@ export function NuevaVenta() {
             </div>
           </Field>
           {matches.length > 0 && (
-            <div className="mt-2 border border-white/10 rounded-lg divide-y divide-white/5">
+            <div className="mt-2 border border-[var(--line)] rounded-lg divide-y divide-white/5">
               {matches.map(p => (
-                <button key={p.id} onClick={() => add(p)} className="w-full px-3 py-2 text-left text-sm hover:bg-white/5 flex justify-between items-center">
+                <button key={p.id} onClick={() => add(p)} className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--mist)] flex justify-between items-center">
                   <span>{p.nombre} <span className="text-gray-500 text-xs">({p.stock} disp.)</span></span>
                   <span className="text-[var(--gold)] font-display text-lg">{fmtCOP(p.precio)}</span>
                 </button>
@@ -164,17 +164,17 @@ export function NuevaVenta() {
                 const ganancia = i.precioUnitario - i.costo;
                 const margen = i.precioUnitario > 0 ? (ganancia / i.precioUnitario) * 100 : 0;
                 return (
-                  <div key={i.id} className="border border-white/10 rounded-lg p-3">
+                  <div key={i.id} className="border border-[var(--line)] rounded-lg p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="font-semibold text-sm">{i.nombre}</div>
-                      <button onClick={() => removeItem(i.id)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => removeItem(i.id)} className="text-red-600 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-2">
                       <Field label="Precio unit."><Input type="number" value={i.precioUnitario} onChange={e => updateItem(i.id, { precioUnitario: +e.target.value || 0 })} /></Field>
                       <Field label="Cantidad"><Input type="number" min={1} value={i.cantidad} onChange={e => updateItem(i.id, { cantidad: Math.max(1, +e.target.value || 1) })} /></Field>
                       <Field label="Subtotal"><div className="px-3 py-2 font-display text-2xl text-[var(--gold)]">{fmtCOP(i.subtotal)}</div></Field>
                     </div>
-                    <div className={`text-xs mt-1 ${ganancia >= 0 ? "text-green-400" : "text-red-400"}`}>
+                    <div className={`text-xs mt-1 ${ganancia >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                       Ganancia: {fmtCOP(ganancia)} ({margen.toFixed(1)}%)
                     </div>
                   </div>
@@ -182,7 +182,7 @@ export function NuevaVenta() {
               })}
             </div>
           )}
-          <div className="mt-4 border-t border-white/10 pt-3 flex justify-between items-center">
+          <div className="mt-4 border-t border-[var(--line)] pt-3 flex justify-between items-center">
             <span className="text-sm text-gray-400 uppercase tracking-widest">Total</span>
             <span className="font-display text-4xl text-[var(--gold)]">{fmtCOP(total)}</span>
           </div>
