@@ -65,16 +65,16 @@ export function Ganancias() {
       <Card>
         <div className="flex flex-wrap gap-2 items-center">
           {periodos.map(p => (
-            <button key={p.id} onClick={() => setPeriodo(p.id)} className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${periodo === p.id ? "bg-[var(--gold)] text-black" : "border border-white/10 text-gray-400"}`}>{p.label}</button>
+            <button key={p.id} onClick={() => setPeriodo(p.id)} className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${periodo === p.id ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>{p.label}</button>
           ))}
           {periodo === "custom" && (
             <div className="flex gap-2 items-center">
-              <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="px-2 py-1 bg-black/40 border border-white/10 rounded text-xs text-white" />
+              <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
               <span className="text-gray-500 text-xs">→</span>
-              <input type="date" value={to} onChange={e => setTo(e.target.value)} className="px-2 py-1 bg-black/40 border border-white/10 rounded text-xs text-white" />
+              <input type="date" value={to} onChange={e => setTo(e.target.value)} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
             </div>
           )}
-          <select value={local} onChange={e => setLocal(e.target.value as never)} className="ml-auto px-3 py-1.5 bg-black/40 border border-white/10 rounded-full text-xs text-white">
+          <select value={local} onChange={e => setLocal(e.target.value as never)} className="ml-auto px-3 py-1.5 bg-white border border-[var(--line)] rounded-full text-xs text-[var(--ink)]">
             <option value="todos">Todos los locales</option>
             <option value="1">Local 1</option>
             <option value="2">Local 2</option>
@@ -89,7 +89,7 @@ export function Ganancias() {
       </div>
 
       <Card>
-        <button onClick={() => setVer(v => !v)} className="text-xs text-[var(--gold)] uppercase font-bold tracking-wider">
+        <button onClick={() => setVer(v => !v)} className="text-xs text-[var(--gold-dark)] uppercase font-bold tracking-wider">
           {verDesglose ? "▼" : "▶"} Ver desglose
         </button>
         {verDesglose && (
@@ -113,7 +113,7 @@ export function Ganancias() {
               {porDia.slice(-14).map(([d, v]) => (
                 <div key={d}>
                   <div className="flex justify-between text-xs text-gray-400"><span>{d}</span><span>{fmtCOP(v)}</span></div>
-                  <div className="h-2 bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-[var(--gold)]" style={{ width: `${(v/maxDia)*100}%` }} /></div>
+                  <div className="h-2 bg-[var(--mist)] rounded-full overflow-hidden"><div className="h-full bg-[var(--gold)]" style={{ width: `${(v/maxDia)*100}%` }} /></div>
                 </div>
               ))}
             </div>
@@ -128,7 +128,7 @@ export function Ganancias() {
               </thead>
               <tbody>
                 {porAsesor.map(([k, d]) => (
-                  <tr key={k} className="border-t border-white/5"><td className="py-1.5">{k}</td><td className="text-right">{d.ventas}</td><td className="text-right">{fmtCOP(d.total)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(d.ganancia)}</td></tr>
+                  <tr key={k} className="border-t border-[var(--line)]"><td className="py-1.5">{k}</td><td className="text-right">{d.ventas}</td><td className="text-right">{fmtCOP(d.total)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(d.ganancia)}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -141,14 +141,14 @@ export function Ganancias() {
         {data.vs.length === 0 ? <p className="text-sm text-gray-500">Sin ventas.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-[10px] text-gray-500 uppercase border-b border-white/10">
+              <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
                 <tr><th className="text-left py-2">Factura</th><th className="text-left">Fecha</th><th className="text-left">Cliente</th><th className="text-right">Total</th><th className="text-right">Ganancia</th><th>Tipo</th></tr>
               </thead>
               <tbody>
                 {data.vs.slice().reverse().slice(0, 50).map(v => {
                   const g = v.total - v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0);
                   return (
-                    <tr key={v.id} className="border-b border-white/5">
+                    <tr key={v.id} className="border-b border-[var(--line)]">
                       <td className="py-2 text-[var(--gold)]">{v.factura}</td>
                       <td className="text-xs text-gray-400">{fmtDate(v.fecha)}</td>
                       <td className="text-xs">{v.cliente?.nombre || "—"}</td>
@@ -170,8 +170,8 @@ export function Ganancias() {
 function Row({ label, v, bold, color }: { label: string; v: number; bold?: boolean; color?: string }) {
   return (
     <div className={`flex justify-between ${bold ? "font-bold" : ""}`}>
-      <span className={bold ? "text-white" : "text-gray-400"}>{label}</span>
-      <span style={{ color: color || (v < 0 ? "#f87171" : "var(--gold)") }}>{fmtCOP(v)}</span>
+      <span className={bold ? "text-[var(--ink)]" : "text-gray-600"}>{label}</span>
+      <span style={{ color: color || (v < 0 ? "#dc2626" : "var(--gold-dark)") }}>{fmtCOP(v)}</span>
     </div>
   );
 }
