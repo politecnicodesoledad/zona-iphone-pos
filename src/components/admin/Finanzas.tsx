@@ -63,9 +63,18 @@ function Historial() {
           {(["hoy","mes","todos"] as Periodo[]).map(p =>
             <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1.5 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>{p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : "Todos"}</button>
           )}
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded text-xs text-white" />
+          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1.5 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
+          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1.5 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por # o cliente" className="w-auto flex-1 min-w-[180px]" />
+          <Btn
+            variant="gold"
+            onClick={() => exportarHistorialPDF(list, cfg, { periodo, tipo, local })}
+            disabled={list.length === 0}
+            className="ml-auto"
+            title={list.length === 0 ? "No hay ventas para exportar" : "Descargar PDF del historial filtrado"}
+          >
+            <Download className="inline w-3.5 h-3.5 mr-1" /> Exportar PDF
+          </Btn>
         </div>
       </Card>
 
