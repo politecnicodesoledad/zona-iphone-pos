@@ -90,17 +90,17 @@ export function AdminShell() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white border-b border-[var(--line)] px-5 flex items-center justify-between gap-4 sticky top-0 z-30">
+        <header className="h-16 bg-[var(--ink)] text-white border-b border-black/40 px-5 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-md">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => setOpen(true)} className="md:hidden w-9 h-9 rounded-lg hover:bg-[var(--mist)] flex items-center justify-center"><Menu className="w-5 h-5" /></button>
-            <h1 className="font-display text-2xl text-[var(--ink)] truncate">{TITLES[mod]}</h1>
+            <button onClick={() => setOpen(true)} className="md:hidden w-9 h-9 rounded-lg hover:bg-white/10 flex items-center justify-center"><Menu className="w-5 h-5" /></button>
+            <h1 className="font-display text-2xl text-white truncate">{TITLES[mod]}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En vivo
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-emerald-300 bg-emerald-900/40 border border-emerald-500/30 px-2.5 py-1 rounded-full font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> En vivo
             </span>
-            <span className="hidden md:inline text-xs text-gray-500 font-medium">{clock}</span>
-            <span className="text-[11px] bg-[var(--cream)] text-[var(--gold-dark)] px-2.5 py-1 rounded-full font-bold border border-[var(--gold)]/30">Factura · {fmtFactura(num)}</span>
+            <span className="hidden md:inline text-xs text-gray-300 font-medium">{clock}</span>
+            <span className="text-[11px] bg-[var(--gold)] text-[var(--ink)] px-2.5 py-1 rounded-full font-bold shadow">Factura · {fmtFactura(num)}</span>
           </div>
         </header>
         <main className="flex-1 overflow-auto p-5 md:p-7 scrollbar-thin">

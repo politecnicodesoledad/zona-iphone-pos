@@ -37,7 +37,7 @@ export function AdminLogin() {
           {err && <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</div>}
           <button type="submit" className="zi-btn-gold w-full text-sm">Entrar</button>
         </form>
-        <p className="text-[10px] text-gray-400 mt-5 text-center">Contraseña por defecto: <b className="text-gray-600">admin123</b></p>
+        <p className="text-[10px] text-gray-400 mt-5 text-center">Contraseña por defecto: <b className="text-gray-600">zonaiphone2025</b></p>
       </div>
     </div>
   );
