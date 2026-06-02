@@ -3,34 +3,60 @@ import autoTable from "jspdf-autotable";
 import type { Venta, ZIConfig } from "./types";
 import { fmtCOP, fmtDateTime, maskCedula } from "./format";
 
+async function loadImageAsDataURL(url: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(url, { mode: "cors" });
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  } catch { return undefined; }
+}
+
 // ───────── FACTURA TÉRMICA (una venta) ─────────
-export function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
+export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   const doc = new jsPDF({ unit: "mm", format: [80, 297] });
-  let y = 8;
+  let y = 6;
   const w = 80;
-  const center = (txt: string, size: number, bold = false) => {
+
+  // intentar logo
+  const logoData = cfg.logoUrl ? await loadImageAsDataURL(cfg.logoUrl) : undefined;
+  if (logoData) {
+    try { doc.addImage(logoData, "PNG", (w - 18) / 2, y, 18, 18); y += 19; } catch { /* skip */ }
+  }
+
+  const center = (txt: string, size: number, bold = false, color: [number, number, number] = [0, 0, 0]) => {
     doc.setFontSize(size);
     doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(...color);
     doc.text(txt, w / 2, y, { align: "center" });
     y += size * 0.45;
   };
-  const line = () => { doc.setLineWidth(0.2); doc.line(4, y, w - 4, y); y += 3; };
-  const row = (l: string, r: string, size = 8) => {
-    doc.setFontSize(size); doc.setFont("helvetica", "normal");
+  const line = () => { doc.setDrawColor(180); doc.setLineWidth(0.2); doc.line(4, y, w - 4, y); y += 2.5; };
+  const row = (l: string, r: string, size = 8, bold = false) => {
+    doc.setFontSize(size);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(0, 0, 0);
     doc.text(l, 4, y); doc.text(r, w - 4, y, { align: "right" });
     y += size * 0.55;
   };
 
-  center(cfg.storeName.toUpperCase(), 14, true);
-  center(cfg.facturaSubtitulo, 8);
+  center(cfg.storeName.toUpperCase(), 14, true, [10, 10, 10]);
+  center(cfg.facturaSubtitulo, 7, false, [156, 130, 48]);
   y += 1;
-  center(cfg.direccion, 7);
-  center("WhatsApp: " + cfg.whatsapp, 7);
+  center(cfg.direccion, 6.5);
+  center("WhatsApp: " + cfg.whatsapp, 6.5);
   y += 2; line();
 
-  center("FACTURA " + venta.factura, 10, true);
-  center(fmtDateTime(venta.fecha), 7);
-  y += 2; line();
+  // bloque factura
+  doc.setFillColor(245, 240, 225);
+  doc.rect(2, y - 1, w - 4, 11, "F");
+  center("FACTURA " + venta.factura, 11, true, [10, 10, 10]);
+  center(fmtDateTime(venta.fecha), 7, false, [80, 80, 80]);
+  y += 3; line();
 
   if (venta.cliente?.nombre) {
     row("Cliente:", venta.cliente.nombre);
@@ -41,25 +67,35 @@ export function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
 
   doc.setFontSize(8); doc.setFont("helvetica", "bold");
   doc.text("Producto", 4, y); doc.text("Total", w - 4, y, { align: "right" });
-  y += 4;
-  doc.setFont("helvetica", "normal");
+  y += 3.5;
+  doc.setLineWidth(0.1); doc.line(4, y - 1, w - 4, y - 1);
+
   venta.productos.forEach(p => {
-    const name = p.nombre.length > 26 ? p.nombre.slice(0, 26) + "…" : p.nombre;
-    doc.text(name, 4, y); y += 3.5;
-    doc.setFontSize(7);
-    doc.text(`${p.cantidad} x ${fmtCOP(p.precioUnitario)}`, 4, y);
+    const name = p.nombre.length > 28 ? p.nombre.slice(0, 28) + "…" : p.nombre;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+    doc.text(name, 4, y); y += 3.2;
+    doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(90, 90, 90);
+    doc.text(`${p.cantidad} × ${fmtCOP(p.precioUnitario)}`, 4, y);
+    doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
     doc.text(fmtCOP(p.subtotal), w - 4, y, { align: "right" });
     y += 4;
-    doc.setFontSize(8);
   });
   line();
-  row("TOTAL", fmtCOP(venta.total), 11);
-  line();
 
+  // total destacado
+  doc.setFillColor(10, 10, 10);
+  doc.rect(2, y - 1, w - 4, 8, "F");
+  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  doc.text("TOTAL", 4, y + 4);
+  doc.setTextColor(201, 168, 76); doc.setFontSize(13);
+  doc.text(fmtCOP(venta.total), w - 4, y + 4.5, { align: "right" });
+  y += 11;
+
+  doc.setTextColor(0, 0, 0);
   row("Pago:", venta.tipo === "contado" ? `Contado (${venta.metodoPago})` : venta.tipo === "credito" ? "Crédito" : "Celular como pago");
   if (venta.tipo === "credito") {
     row("Cuota inicial:", fmtCOP(venta.creditoCuotaInicial || 0));
-    row("Cuotas:", `${venta.creditoCuotas} x ${fmtCOP(venta.creditoValorCuota || 0)}`);
+    row("Cuotas:", `${venta.creditoCuotas} × ${fmtCOP(venta.creditoValorCuota || 0)}`);
   }
   if (venta.tipo === "tradein" && venta.tradeIn) {
     row("Recibido:", `${venta.tradeIn.marca} ${venta.tradeIn.modelo}`);
@@ -69,20 +105,23 @@ export function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   if (venta.asesor) row("Atendió:", venta.asesor);
   y += 1; line();
 
-  doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("GARANTÍA", 4, y); y += 3;
-  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7); doc.setFont("helvetica", "bold");
+  doc.setTextColor(156, 130, 48); doc.text("GARANTÍA", 4, y); y += 3;
+  doc.setFont("helvetica", "normal"); doc.setTextColor(60, 60, 60);
   const garantia = doc.splitTextToSize(cfg.facturaGarantia, w - 8);
   doc.text(garantia, 4, y); y += garantia.length * 3;
 
   if (venta.observaciones) {
-    y += 1; doc.setFont("helvetica", "bold"); doc.text("OBSERVACIONES", 4, y); y += 3;
-    doc.setFont("helvetica", "normal");
+    y += 1;
+    doc.setFont("helvetica", "bold"); doc.setTextColor(156, 130, 48);
+    doc.text("OBSERVACIONES", 4, y); y += 3;
+    doc.setFont("helvetica", "normal"); doc.setTextColor(60, 60, 60);
     const obs = doc.splitTextToSize(venta.observaciones, w - 8);
     doc.text(obs, 4, y); y += obs.length * 3;
   }
 
   y += 2; line();
-  doc.setFontSize(8); doc.setFont("helvetica", "italic");
+  doc.setFontSize(8); doc.setFont("helvetica", "italic"); doc.setTextColor(10, 10, 10);
   const gracias = doc.splitTextToSize(cfg.facturaGracias, w - 8);
   doc.text(gracias, w / 2, y, { align: "center" });
 
@@ -98,22 +137,8 @@ export async function exportarHistorialPDF(
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
 
-  // intentar cargar logo
-  let logoData: string | undefined;
-  try {
-    if (cfg.logoUrl) {
-      const res = await fetch(cfg.logoUrl);
-      const blob = await res.blob();
-      logoData = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result as string);
-        r.onerror = reject;
-        r.readAsDataURL(blob);
-      });
-    }
-  } catch { /* sin logo */ }
+  const logoData = cfg.logoUrl ? await loadImageAsDataURL(cfg.logoUrl) : undefined;
 
-  // ───── HEADER ─────
   const gold = [201, 168, 76] as [number, number, number];
   const ink = [10, 10, 10] as [number, number, number];
 
@@ -133,7 +158,6 @@ export async function exportarHistorialPDF(
   doc.setTextColor(220, 220, 220); doc.setFontSize(8);
   doc.text(cfg.direccion, 32, 24);
 
-  // meta derecha
   doc.setTextColor(255, 255, 255); doc.setFontSize(8);
   const PERIODO_LABEL: Record<string, string> = {
     hoy: "Hoy", semana: "Esta semana", mes: "Este mes", anio: "Este año", custom: "Personalizado", todos: "Todos",
@@ -147,7 +171,6 @@ export async function exportarHistorialPDF(
   doc.text(`Local: ${localTxt}`, pageW - 10, 20, { align: "right" });
   doc.text(`Generado: ${new Date().toLocaleString("es-CO")}`, pageW - 10, 25, { align: "right" });
 
-  // ───── TABLA ─────
   const rows = ventas.map(v => [
     v.factura,
     new Date(v.fecha).toLocaleString("es-CO", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }),
@@ -155,7 +178,7 @@ export async function exportarHistorialPDF(
     v.cliente?.cedula ? maskCedula(v.cliente.cedula) : "—",
     v.productos.map(p => p.nombre).join(", "),
     v.productos.reduce((s, p) => s + p.cantidad, 0).toString(),
-    fmtCOP(v.productos.reduce((s, p) => s + (p.precioUnitario * p.cantidad), 0) / Math.max(1, v.productos.reduce((s, p) => s + p.cantidad, 0))),
+    fmtCOP(v.total / Math.max(1, v.productos.reduce((s, p) => s + p.cantidad, 0))),
     fmtCOP(v.total),
     v.tipo === "contado" ? `Contado${v.metodoPago ? ` (${v.metodoPago})` : ""}` : v.tipo === "credito" ? "Crédito" : "Cel como pago",
     v.asesor || "—",
@@ -186,17 +209,11 @@ export async function exportarHistorialPDF(
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 10) {
         const val = String(data.cell.raw);
-        if (val === "Cancelada") {
-          data.cell.styles.textColor = [185, 28, 28];
-          data.cell.styles.fontStyle = "bold";
-        } else {
-          data.cell.styles.textColor = [21, 128, 61];
-          data.cell.styles.fontStyle = "bold";
-        }
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.textColor = val === "Cancelada" ? [185, 28, 28] : [21, 128, 61];
       }
     },
     didDrawPage: () => {
-      // pie con paginación
       const pageH = doc.internal.pageSize.getHeight();
       doc.setFontSize(7); doc.setTextColor(150);
       doc.text(`${cfg.storeName} · Reporte interno · ${new Date().toLocaleDateString("es-CO")}`, 10, pageH - 6);
@@ -204,7 +221,6 @@ export async function exportarHistorialPDF(
     },
   });
 
-  // ───── TOTALES ─────
   const activas = ventas.filter(v => !v.cancelada);
   const totalIngresos = activas.reduce((s, v) => s + v.total, 0);
   const totalCosto = activas.reduce((s, v) => s + v.productos.reduce((a, p) => a + p.costo * p.cantidad, 0), 0);
