@@ -158,7 +158,12 @@ export interface ZIConfig {
   facturaGracias: string;
   local1nombre: string;
   local2nombre: string;
+  local1activo: boolean;
+  local2activo: boolean;
   techWhatsapp: string;
+  // hero
+  heroTagline: string;
+  heroImageUrl: string;
   // event
   eventActive: boolean;
   eventType: EventType;
