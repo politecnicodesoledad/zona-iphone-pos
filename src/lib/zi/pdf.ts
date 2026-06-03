@@ -16,6 +16,28 @@ async function loadImageAsDataURL(url: string): Promise<string | undefined> {
   } catch { return undefined; }
 }
 
+async function toBlackWhite(dataUrl: string): Promise<string> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext("2d");
+      if (!ctx) return resolve(dataUrl);
+      ctx.drawImage(img, 0, 0);
+      const image = ctx.getImageData(0, 0, c.width, c.height);
+      for (let i = 0; i < image.data.length; i += 4) {
+        const g = image.data[i] * 0.299 + image.data[i + 1] * 0.587 + image.data[i + 2] * 0.114;
+        image.data[i] = image.data[i + 1] = image.data[i + 2] = g > 175 ? 255 : 0;
+      }
+      ctx.putImageData(image, 0, 0);
+      resolve(c.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 // ───────── FACTURA TÉRMICA (una venta) ─────────
 export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   const doc = new jsPDF({ unit: "mm", format: [80, 297] });
@@ -23,9 +45,10 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   const w = 80;
 
   // intentar logo
-  const logoData = cfg.logoUrl ? await loadImageAsDataURL(cfg.logoUrl) : undefined;
+  const rawLogo = cfg.logoUrl ? await loadImageAsDataURL(cfg.logoUrl) : undefined;
+  const logoData = rawLogo ? await toBlackWhite(rawLogo) : undefined;
   if (logoData) {
-    try { doc.addImage(logoData, "PNG", (w - 18) / 2, y, 18, 18); y += 19; } catch { /* skip */ }
+    try { doc.addImage(logoData, "PNG", (w - 16) / 2, y, 16, 16); y += 17; } catch { /* skip */ }
   }
 
   const center = (txt: string, size: number, bold = false, color: [number, number, number] = [0, 0, 0]) => {
@@ -35,7 +58,7 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
     doc.text(txt, w / 2, y, { align: "center" });
     y += size * 0.45;
   };
-  const line = () => { doc.setDrawColor(180); doc.setLineWidth(0.2); doc.line(4, y, w - 4, y); y += 2.5; };
+  const line = (heavy = false) => { doc.setDrawColor(0); doc.setLineWidth(heavy ? 0.45 : 0.15); doc.line(4, y, w - 4, y); y += heavy ? 2.2 : 1.8; };
   const row = (l: string, r: string, size = 8, bold = false) => {
     doc.setFontSize(size);
     doc.setFont("helvetica", bold ? "bold" : "normal");
@@ -44,52 +67,45 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
     y += size * 0.55;
   };
 
-  center(cfg.storeName.toUpperCase(), 14, true, [10, 10, 10]);
-  center(cfg.facturaSubtitulo, 7, false, [156, 130, 48]);
+  center(cfg.storeName.toUpperCase(), 12, true, [0, 0, 0]);
+  center(cfg.facturaSubtitulo, 6, false, [0, 0, 0]);
   y += 1;
-  center(cfg.direccion, 6.5);
-  center("WhatsApp: " + cfg.whatsapp, 6.5);
-  y += 2; line();
+  doc.setFontSize(5.8); doc.setFont("courier", "normal"); doc.setTextColor(0, 0, 0);
+  doc.text(doc.splitTextToSize(cfg.direccion, 58), w / 2, y, { align: "center" }); y += 6;
+  center("+" + cfg.whatsapp, 6);
+  y += 1; line(true);
 
   // bloque factura
-  doc.setFillColor(245, 240, 225);
-  doc.rect(2, y - 1, w - 4, 11, "F");
-  center("FACTURA " + venta.factura, 11, true, [10, 10, 10]);
-  center(fmtDateTime(venta.fecha), 7, false, [80, 80, 80]);
-  y += 3; line();
+  center("FACTURA # " + venta.factura.replace("#", ""), 10, true, [0, 0, 0]);
+  line();
+  row("Fecha:", fmtDateTime(venta.fecha), 6.5);
+  line();
 
   if (venta.cliente?.nombre) {
     row("Cliente:", venta.cliente.nombre);
     if (venta.cliente.cedula) row("Cédula:", maskCedula(venta.cliente.cedula));
     if (venta.cliente.telefono) row("Tel:", venta.cliente.telefono);
-    y += 1; line();
+    y += 1; line(true);
   }
 
-  doc.setFontSize(8); doc.setFont("helvetica", "bold");
-  doc.text("Producto", 4, y); doc.text("Total", w - 4, y, { align: "right" });
-  y += 3.5;
-  doc.setLineWidth(0.1); doc.line(4, y - 1, w - 4, y - 1);
+  doc.setFontSize(6.8); doc.setFont("courier", "bold");
+  doc.text("DESC", 4, y); doc.text("CANT", 33, y); doc.text("VR.", 46, y); doc.text("TOTAL", w - 4, y, { align: "right" });
+  y += 2.5; line();
 
   venta.productos.forEach(p => {
-    const name = p.nombre.length > 28 ? p.nombre.slice(0, 28) + "…" : p.nombre;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-    doc.text(name, 4, y); y += 3.2;
-    doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(90, 90, 90);
-    doc.text(`${p.cantidad} × ${fmtCOP(p.precioUnitario)}`, 4, y);
-    doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
-    doc.text(fmtCOP(p.subtotal), w - 4, y, { align: "right" });
-    y += 4;
+    const name = p.nombre.length > 25 ? p.nombre.slice(0, 25) + "…" : p.nombre;
+    doc.setFont("courier", "bold"); doc.setFontSize(6.6); doc.setTextColor(0, 0, 0);
+    doc.text(name, 4, y); doc.text(String(p.cantidad), 35, y, { align: "center" }); doc.text(fmtCOP(p.precioUnitario), 57, y, { align: "right" }); doc.text(fmtCOP(p.subtotal), w - 4, y, { align: "right" }); y += 3.5;
+    if (p.descuento) { doc.setFont("courier", "normal"); doc.setTextColor(90); doc.text("DESC - " + fmtCOP(p.descuento), 4, y); doc.text("-" + fmtCOP(p.descuento), w - 4, y, { align: "right" }); y += 3; }
   });
-  line();
+  line(true);
 
   // total destacado
-  doc.setFillColor(10, 10, 10);
-  doc.rect(2, y - 1, w - 4, 8, "F");
-  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
   doc.text("TOTAL", 4, y + 4);
-  doc.setTextColor(201, 168, 76); doc.setFontSize(13);
+  doc.setFontSize(13);
   doc.text(fmtCOP(venta.total), w - 4, y + 4.5, { align: "right" });
-  y += 11;
+  y += 8; line(true);
 
   doc.setTextColor(0, 0, 0);
   row("Pago:", venta.tipo === "contado" ? `Contado (${venta.metodoPago})` : venta.tipo === "credito" ? "Crédito" : "Celular como pago");
@@ -105,9 +121,9 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   if (venta.asesor) row("Atendió:", venta.asesor);
   y += 1; line();
 
-  doc.setFontSize(7); doc.setFont("helvetica", "bold");
-  doc.setTextColor(156, 130, 48); doc.text("GARANTÍA", 4, y); y += 3;
-  doc.setFont("helvetica", "normal"); doc.setTextColor(60, 60, 60);
+  doc.setFontSize(6.8); doc.setFont("courier", "bold");
+  doc.setTextColor(0, 0, 0); doc.text("GARANTIA", 4, y); y += 3;
+  doc.setFont("courier", "normal"); doc.setTextColor(0, 0, 0);
   const garantia = doc.splitTextToSize(cfg.facturaGarantia, w - 8);
   doc.text(garantia, 4, y); y += garantia.length * 3;
 

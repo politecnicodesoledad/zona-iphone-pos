@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useVentas, useGastos, useEmpleados } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, rangeFor, type Periodo } from "@/lib/zi/format";
 import { Card, Stat, Btn } from "./ui";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export function Ganancias() {
   const [ventas] = useVentas();
@@ -53,6 +54,7 @@ export function Ganancias() {
     return [...m.entries()];
   }, [data.vs]);
   const maxDia = Math.max(1, ...porDia.map(([, v]) => v));
+  const chartData = porDia.slice(-14).map(([fecha, ventas]) => ({ fecha, ventas }));
 
   const periodos: { id: Periodo; label: string }[] = [
     { id: "hoy", label: "Hoy" }, { id: "semana", label: "Esta semana" },
@@ -103,6 +105,33 @@ export function Ganancias() {
             <Row label="Lo que te queda (ganancia neta)" v={data.neta} bold color={data.neta < 0 ? "#ef4444" : "var(--gold)"} />
           </div>
         )}
+      </Card>
+
+      <Card>
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <div>
+            <h3 className="font-display text-2xl text-[var(--ink)]">Gráfica breve de ingresos</h3>
+            <p className="text-xs text-gray-500">Últimos días dentro del filtro activo</p>
+          </div>
+          <div className="font-display text-3xl text-[var(--gold-dark)]">{fmtCOP(data.ingresos)}</div>
+        </div>
+        <div className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="ziGoldArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--gold)" stopOpacity={0.45}/>
+                  <stop offset="95%" stopColor="var(--gold)" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="var(--line)" vertical={false} />
+              <XAxis dataKey="fecha" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `$${Math.round(Number(v) / 1000)}k`} tickLine={false} axisLine={false} width={48} />
+              <Tooltip formatter={(v) => fmtCOP(Number(v))} labelStyle={{ color: "var(--ink)" }} />
+              <Area type="monotone" dataKey="ventas" stroke="var(--gold-dark)" strokeWidth={3} fill="url(#ziGoldArea)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">

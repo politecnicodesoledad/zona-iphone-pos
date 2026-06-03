@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
-import { useProductos, useOtros, useGastos, useVendidos, uid } from "@/lib/zi/store";
+import { useProductos, useOtros, useGastos, useVendidos, useConfig, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate } from "@/lib/zi/format";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field, Modal, Stat } from "./ui";
 import type { Producto, Categoria, EstadoProducto, CostoOrigen, ColorOpt } from "@/lib/zi/types";
-import { Trash2, Plus, RotateCcw, Edit } from "lucide-react";
+import { Trash2, Plus, RotateCcw, Edit, ImagePlus, Link as LinkIcon, Upload } from "lucide-react";
+import { GALERIA_IPHONE } from "@/lib/zi/galeria-iphone";
 
 export function Inventario() {
   const [tab, setTab] = useState("productos");
@@ -104,7 +105,7 @@ function ProductosTab({ modo }: { modo: "productos" | "accesorios" }) {
         )}
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editing?.id ? "Editar producto" : "Agregar producto"} size="lg">
+      <Modal open={open} onClose={() => setOpen(false)} title={editing?.id ? "Editar producto" : "Agregar producto"} size="xl">
         {editing && <ProductForm value={editing} onChange={setEditing} onSave={save} hideImei={modo === "accesorios"} />}
       </Modal>
     </div>
@@ -112,9 +113,13 @@ function ProductosTab({ modo }: { modo: "productos" | "accesorios" }) {
 }
 
 function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; onChange: (p: Producto) => void; onSave: (p: Producto) => void; hideImei?: boolean }) {
+  const [cfg] = useConfig();
+  const [imageMode, setImageMode] = useState<"galeria" | "link" | "archivo">("galeria");
+  const [galleryQ, setGalleryQ] = useState(value.nombre || "");
   const ganancia = value.precio - value.costo;
   const margen = value.precio > 0 ? (ganancia / value.precio) * 100 : 0;
   const showImei = !hideImei && ["iphone", "ipad", "macbook"].includes(value.categoria);
+  const galleryItems = GALERIA_IPHONE.filter(g => `${g.modelo} ${g.color}`.toLowerCase().includes(galleryQ.toLowerCase())).slice(0, 18);
 
   function addColor() {
     onChange({ ...value, colores: [...(value.colores || []), { nombre: "Color", hex: "#000000" }] });
@@ -122,12 +127,18 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
   function updateColor(i: number, c: Partial<ColorOpt>) {
     const arr = [...value.colores]; arr[i] = { ...arr[i], ...c }; onChange({ ...value, colores: arr });
   }
+  function uploadImage(f: File) {
+    const reader = new FileReader();
+    reader.onload = () => onChange({ ...value, imagen: reader.result as string });
+    reader.readAsDataURL(f);
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="grid xl:grid-cols-[1fr_340px] gap-5">
+      <div className="space-y-4 min-w-0">
       <h4 className="text-xs uppercase tracking-widest text-gray-500 border-b border-[var(--line)] pb-2">Datos básicos</h4>
       <div className="grid md:grid-cols-2 gap-3">
-        <Field label="Nombre"><Input value={value.nombre} onChange={e => onChange({ ...value, nombre: e.target.value })} /></Field>
+        <Field label="Nombre"><Input value={value.nombre} onChange={e => { onChange({ ...value, nombre: e.target.value }); setGalleryQ(e.target.value); }} /></Field>
         <Field label="Categoría"><Select value={value.categoria} onChange={e => onChange({ ...value, categoria: e.target.value as Categoria })}>
           <option value="iphone">iPhone</option><option value="ipad">iPad</option><option value="macbook">MacBook</option>
           <option value="accesorio">Accesorios</option><option value="otro">Otro</option>
@@ -139,9 +150,21 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
         </Select></Field>
         <Field label="Precio"><Input type="number" value={value.precio} onChange={e => onChange({ ...value, precio: +e.target.value || 0 })} /></Field>
         <Field label="Stock"><Input type="number" value={value.stock} onChange={e => onChange({ ...value, stock: +e.target.value || 0 })} /></Field>
-        <Field label="Local"><Select value={value.local} onChange={e => onChange({ ...value, local: +e.target.value as 1 | 2 })}><option value={1}>Local 1</option><option value={2}>Local 2</option></Select></Field>
-        <Field label="Imagen URL"><Input value={value.imagen || ""} onChange={e => onChange({ ...value, imagen: e.target.value })} /></Field>
+        <Field label="Local"><Select value={value.local} onChange={e => onChange({ ...value, local: +e.target.value as 1 | 2 })}>{cfg.local1activo && <option value={1}>{cfg.local1nombre}</option>}{cfg.local2activo && <option value={2}>{cfg.local2nombre}</option>}</Select></Field>
       </div>
+
+      <Field label="Imagen del producto">
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--mist)] p-3">
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {([{ id: "galeria", label: "Galería", Icon: ImagePlus }, { id: "archivo", label: "Archivo", Icon: Upload }, { id: "link", label: "Link", Icon: LinkIcon }] as const).map(({ id, label, Icon }) => (
+              <button key={id} type="button" onClick={() => setImageMode(id)} className={`h-10 rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition ${imageMode === id ? "bg-[var(--ink)] text-white" : "bg-white text-gray-600 border border-[var(--line)] hover:border-[var(--gold)]"}`}><Icon className="w-3.5 h-3.5" /> {label}</button>
+            ))}
+          </div>
+          {imageMode === "link" && <Input value={value.imagen || ""} onChange={e => onChange({ ...value, imagen: e.target.value })} placeholder="https://..." />}
+          {imageMode === "archivo" && <label className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[var(--gold)] bg-white text-center text-xs text-gray-500 hover:bg-[var(--cream)]"><Upload className="mb-2 h-5 w-5 text-[var(--gold-dark)]" />Subir imagen desde archivos<input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0])} /></label>}
+          {imageMode === "galeria" && <div className="space-y-3"><Input value={galleryQ} onChange={e => setGalleryQ(e.target.value)} placeholder="Buscar modelo/color" /><div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">{galleryItems.map(g => <button key={`${g.modelo}-${g.color}`} type="button" onClick={() => onChange({ ...value, imagen: g.url, nombre: value.nombre || g.modelo })} className={`rounded-xl border bg-white p-2 text-left hover:border-[var(--gold)] hover:shadow-soft transition ${value.imagen === g.url ? "border-[var(--gold)] ring-2 ring-[var(--gold)]/20" : "border-[var(--line)]"}`}><div className="h-16 w-full rounded-lg bg-[var(--mist)] flex items-center justify-center overflow-hidden"><img src={g.url} alt={`${g.modelo} ${g.color}`} className="h-full w-full object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} /><ImagePlus className="absolute h-6 w-6 text-gray-300" /></div><div className="mt-1 truncate text-[10px] font-bold">{g.modelo}</div><div className="truncate text-[9px] text-gray-500">{g.color}</div></button>)}</div></div>}
+        </div>
+      </Field>
 
       <Field label="Colores disponibles">
         <div className="space-y-2">
@@ -176,13 +199,20 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
         </div>
       )}
 
+      </div>
+      <aside className="xl:sticky xl:top-4 h-fit space-y-4">
       <Card className="bg-[var(--cream)] border-[var(--gold)]/40">
+        <div className="aspect-[4/3] rounded-2xl bg-white border border-[var(--line)] mb-4 flex items-center justify-center p-5 overflow-hidden">
+          {value.imagen ? <img src={value.imagen} alt={value.nombre} className="max-h-full object-contain" /> : <ImagePlus className="w-16 h-16 text-gray-300" />}
+        </div>
         <div className="text-xs text-gray-400 uppercase tracking-widest">Vista previa</div>
+        <div className="font-bold text-[var(--ink)] mt-1">{value.nombre || "Producto sin nombre"}</div>
         <div className="font-display text-3xl text-[var(--gold)]">{fmtCOP(ganancia)} <span className="text-sm text-gray-500">({margen.toFixed(1)}%)</span></div>
-        <div className="text-xs text-gray-500">Ganancia por unidad</div>
+        <div className="text-xs text-gray-500">Ganancia por unidad · Inversión {fmtCOP(value.costo * value.stock)}</div>
       </Card>
 
       <Btn onClick={() => onSave(value)} className="w-full py-3">💾 Guardar producto</Btn>
+      </aside>
     </div>
   );
 }

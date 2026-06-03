@@ -40,6 +40,8 @@ export interface VentaProducto {
   precioUnitario: number;
   costo: number;
   subtotal: number;
+  descuento?: number;
+  esRapido?: boolean;
   varianteId?: string;
   color?: string;
 }
@@ -53,6 +55,7 @@ export interface Venta {
   asesor?: string;
   productos: VentaProducto[];
   total: number;
+  descuentoTotal?: number;
   metodoPago?: "efectivo" | "nequi" | "transferencia" | "datafono";
   recibido?: number;
   cliente?: { nombre: string; cedula?: string; telefono?: string };
