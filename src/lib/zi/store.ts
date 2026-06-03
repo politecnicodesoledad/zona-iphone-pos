@@ -55,18 +55,26 @@ export const DEFAULT_CONFIG: ZIConfig = {
 };
 
 // --- raw helpers ---
+const cache = new Map<string, { raw: string; value: unknown }>();
+
 function read<T>(key: string, fallback: T): T {
   if (typeof localStorage === "undefined") return fallback;
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return fallback;
-    return JSON.parse(raw) as T;
+    const hit = cache.get(key);
+    if (hit && hit.raw === raw) return hit.value as T;
+    const value = JSON.parse(raw) as T;
+    cache.set(key, { raw, value });
+    return value;
   } catch {
     return fallback;
   }
 }
 function write<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
+  const raw = JSON.stringify(value);
+  cache.set(key, { raw, value });
+  localStorage.setItem(key, raw);
   window.dispatchEvent(new StorageEvent("storage", { key }));
 }
 

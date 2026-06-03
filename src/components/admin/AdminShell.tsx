@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import { BarChart3, ShoppingBag, Wallet, Package, Users, Settings, LogOut, Menu, X } from "lucide-react";
+import { BarChart3, ShoppingBag, Wallet, Package, Users, Settings, LogOut, Menu, ReceiptText } from "lucide-react";
 import { useSession, useConfig, useFacturaNum } from "@/lib/zi/store";
 import { fmtFactura } from "@/lib/zi/store";
 import { Ganancias } from "./Ganancias";
 import { NuevaVenta } from "./NuevaVenta";
-import { Finanzas } from "./Finanzas";
+import { Finanzas, Gastos } from "./Finanzas";
 import { Inventario } from "./Inventario";
 import { ClientesEmpleados } from "./ClientesEmpleados";
 import { Configuracion } from "./Configuracion";
 
-type Mod = "ganancias" | "venta" | "finanzas" | "inventario" | "clientes" | "config";
+type Mod = "ganancias" | "venta" | "movimientos" | "gastos" | "inventario" | "clientes" | "config";
 
 export function AdminShell() {
   const { logout } = useSession();
@@ -30,7 +30,8 @@ export function AdminShell() {
   const items: { id: Mod; icon: typeof BarChart3; label: string; badge?: string }[] = [
     { id: "ganancias", icon: BarChart3, label: "Ganancias" },
     { id: "venta", icon: ShoppingBag, label: "Nueva venta", badge: fmtFactura(num) },
-    { id: "finanzas", icon: Wallet, label: "Finanzas" },
+    { id: "movimientos", icon: Wallet, label: "Movimientos" },
+    { id: "gastos", icon: ReceiptText, label: "Gastos" },
     { id: "inventario", icon: Package, label: "Inventario" },
     { id: "clientes", icon: Users, label: "Clientes" },
     { id: "config", icon: Settings, label: "Configuración" },
@@ -39,7 +40,8 @@ export function AdminShell() {
   const TITLES: Record<Mod, string> = {
     ganancias: "Resumen de ganancias",
     venta: "Registrar nueva venta",
-    finanzas: "Finanzas y movimientos",
+    movimientos: "Movimientos e historial",
+    gastos: "Gastos operativos",
     inventario: "Inventario",
     clientes: "Clientes y empleados",
     config: "Configuración",
@@ -104,10 +106,11 @@ export function AdminShell() {
           </div>
         </header>
         <main className="flex-1 overflow-auto p-5 md:p-7 scrollbar-thin">
-          <div className="max-w-[1400px] mx-auto animate-fade-up">
+          <div className="max-w-[1400px] mx-auto">
             {mod === "ganancias" && <Ganancias />}
             {mod === "venta" && <NuevaVenta />}
-            {mod === "finanzas" && <Finanzas />}
+            {mod === "movimientos" && <Finanzas />}
+            {mod === "gastos" && <Gastos />}
             {mod === "inventario" && <Inventario />}
             {mod === "clientes" && <ClientesEmpleados />}
             {mod === "config" && <Configuracion />}

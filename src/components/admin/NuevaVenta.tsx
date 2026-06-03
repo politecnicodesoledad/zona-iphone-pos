@@ -18,6 +18,10 @@ export function NuevaVenta() {
 
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<Item[]>([]);
+  const [quickNombre, setQuickNombre] = useState("");
+  const [quickCosto, setQuickCosto] = useState(0);
+  const [quickPrecio, setQuickPrecio] = useState(0);
+  const [quickStock, setQuickStock] = useState(1);
   const [tipoPago, setTipoPago] = useState<"contado" | "credito" | "tradein">("contado");
   const [metodo, setMetodo] = useState<"efectivo" | "nequi" | "transferencia" | "datafono">("efectivo");
   const [recibido, setRecibido] = useState(0);
@@ -41,18 +45,34 @@ export function NuevaVenta() {
 
   const matches = useMemo(() => search ? productos.filter(p => p.stock > 0 && p.nombre.toLowerCase().includes(search.toLowerCase())).slice(0, 6) : [], [productos, search]);
   const total = items.reduce((s, i) => s + i.subtotal, 0);
+  const descuentoTotal = items.reduce((s, i) => s + (i.descuento || 0), 0);
   const cValorCuota = cCuotas > 0 ? (total - cInicial) / cCuotas : 0;
   const tRestante = total - tValor;
 
   function add(p: Producto) {
     setItems(prev => [...prev, {
       id: uid(), productoId: p.id, nombre: p.nombre, cantidad: 1,
-      precioUnitario: p.precio, precioBase: p.precio, costo: p.costo, subtotal: p.precio,
+      precioUnitario: p.precio, precioBase: p.precio, costo: p.costo, descuento: 0, subtotal: p.precio,
     }]);
     setSearch("");
   }
+  function addQuick() {
+    if (!quickNombre.trim()) { alert("Escribe el nombre del producto personalizado"); return; }
+    const cantidad = Math.max(1, quickStock || 1);
+    setItems(prev => [...prev, {
+      id: uid(), productoId: `rapido-${uid()}`, nombre: quickNombre.trim(), cantidad,
+      precioUnitario: quickPrecio, precioBase: quickPrecio, costo: quickCosto, descuento: 0,
+      subtotal: quickPrecio * cantidad, esRapido: true,
+    }]);
+    setQuickNombre(""); setQuickCosto(0); setQuickPrecio(0); setQuickStock(1);
+  }
   function updateItem(id: string, patch: Partial<Item>) {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, ...patch, subtotal: (patch.precioUnitario ?? i.precioUnitario) * (patch.cantidad ?? i.cantidad) } : i));
+    setItems(prev => prev.map(i => {
+      if (i.id !== id) return i;
+      const next = { ...i, ...patch };
+      next.subtotal = Math.max(0, next.precioUnitario * next.cantidad - (next.descuento || 0));
+      return next;
+    }));
   }
   function removeItem(id: string) { setItems(prev => prev.filter(i => i.id !== id)); }
 
@@ -62,7 +82,7 @@ export function NuevaVenta() {
     const venta: Venta = {
       id: uid(), factura, fecha: Date.now(), tipo: tipoPago, local, asesor,
       productos: items.map(({ id: _id, precioBase: _pb, ...rest }) => rest),
-      total, observaciones: obs,
+      total, descuentoTotal, observaciones: obs,
       ...(tipoPago === "contado" && { metodoPago: metodo, recibido }),
       ...(tipoPago === "credito" && {
         cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel },
@@ -156,6 +176,17 @@ export function NuevaVenta() {
           )}
         </Card>
 
+        <Card className="border-[var(--gold)]/30 bg-[var(--cream)]/60">
+          <h3 className="font-display text-xl text-[var(--gold-dark)] mb-3">Venta rápida personalizada</h3>
+          <div className="grid md:grid-cols-5 gap-3 items-end">
+            <Field label="Nombre"><Input value={quickNombre} onChange={e => setQuickNombre(e.target.value)} placeholder="Ej: iPhone pedido" /></Field>
+            <Field label="Costo compra"><Input type="number" value={quickCosto} onChange={e => setQuickCosto(+e.target.value || 0)} /></Field>
+            <Field label="Precio venta"><Input type="number" value={quickPrecio} onChange={e => setQuickPrecio(+e.target.value || 0)} /></Field>
+            <Field label="Stock/Cant."><Input type="number" min={1} value={quickStock} onChange={e => setQuickStock(Math.max(1, +e.target.value || 1))} /></Field>
+            <Btn variant="ink" onClick={addQuick} className="h-10">Agregar rápido</Btn>
+          </div>
+        </Card>
+
         <Card>
           <h3 className="font-display text-xl text-[var(--gold)] mb-3">Carrito ({items.length})</h3>
           {items.length === 0 ? <p className="text-sm text-gray-500">No hay productos agregados.</p> : (
@@ -169,9 +200,10 @@ export function NuevaVenta() {
                       <div className="font-semibold text-sm">{i.nombre}</div>
                       <button onClick={() => removeItem(i.id)} className="text-red-600 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
                       <Field label="Precio unit."><Input type="number" value={i.precioUnitario} onChange={e => updateItem(i.id, { precioUnitario: +e.target.value || 0 })} /></Field>
                       <Field label="Cantidad"><Input type="number" min={1} value={i.cantidad} onChange={e => updateItem(i.id, { cantidad: Math.max(1, +e.target.value || 1) })} /></Field>
+                      <Field label="Descuento"><Input type="number" value={i.descuento || 0} onChange={e => updateItem(i.id, { descuento: +e.target.value || 0 })} /></Field>
                       <Field label="Subtotal"><div className="px-3 py-2 font-display text-2xl text-[var(--gold)]">{fmtCOP(i.subtotal)}</div></Field>
                     </div>
                     <div className={`text-xs mt-1 ${ganancia >= 0 ? "text-emerald-600" : "text-red-600"}`}>
@@ -182,9 +214,9 @@ export function NuevaVenta() {
               })}
             </div>
           )}
-          <div className="mt-4 border-t border-[var(--line)] pt-3 flex justify-between items-center">
-            <span className="text-sm text-gray-400 uppercase tracking-widest">Total</span>
-            <span className="font-display text-4xl text-[var(--gold)]">{fmtCOP(total)}</span>
+          <div className="mt-4 border-t border-[var(--line)] pt-3 space-y-1">
+            <div className="flex justify-between text-sm"><span className="text-gray-500">Descuentos</span><span className="text-red-600">− {fmtCOP(descuentoTotal)}</span></div>
+            <div className="flex justify-between items-center"><span className="text-sm text-gray-400 uppercase tracking-widest">Total</span><span className="font-display text-4xl text-[var(--gold)]">{fmtCOP(total)}</span></div>
           </div>
         </Card>
 
@@ -237,8 +269,8 @@ export function NuevaVenta() {
           <Field label="Observaciones / Garantía"><Textarea rows={3} value={obs} onChange={e => setObs(e.target.value)} /></Field>
           <Field label="Local">
             <Select value={local} onChange={e => setLocal(+e.target.value as 1 | 2)}>
-              <option value={1}>{cfg.local1nombre}</option>
-              <option value={2}>{cfg.local2nombre}</option>
+              {cfg.local1activo && <option value={1}>{cfg.local1nombre}</option>}
+              {cfg.local2activo && <option value={2}>{cfg.local2nombre}</option>}
             </Select>
           </Field>
         </Card>

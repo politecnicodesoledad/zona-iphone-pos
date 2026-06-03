@@ -1,27 +1,21 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { Link, useParams } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { MessageCircle, ArrowLeft, ShieldCheck, Truck, CreditCard, Smartphone } from "lucide-react";
 import { useConfig, useProductos } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
 import type { ColorOpt } from "@/lib/zi/types";
 
-export const Route = createFileRoute("/producto/$id")({
-  head: () => ({ meta: [{ title: "Producto · Zona iPhone" }] }),
-  component: ProductoPage,
-});
-
-function ProductoPage() {
-  const { id } = Route.useParams();
+export function ProductoPage() {
+  const { id = "" } = useParams();
   const [cfg] = useConfig();
   const [productos] = useProductos();
   const p = productos.find(x => x.id === id);
   const [color, setColor] = useState<ColorOpt | undefined>(p?.colores?.[0]);
-  if (!p) throw notFound();
-
   const similares = useMemo(
-    () => productos.filter(x => x.id !== p.id && x.categoria === p.categoria && x.stock > 0).slice(0, 4),
+    () => p ? productos.filter(x => x.id !== p.id && x.categoria === p.categoria && x.stock > 0).slice(0, 4) : [],
     [productos, p],
   );
+  if (!p) return <div className="min-h-screen grid place-items-center bg-white text-[var(--ink)]"><div className="text-center"><h1 className="font-display text-5xl">Producto no encontrado</h1><Link to="/" className="text-[var(--gold-dark)] underline">Volver al catálogo</Link></div></div>;
 
   const msg = `Hola! Quiero comprar:\n📱 ${p.nombre}${color ? `\n🎨 Color: ${color.nombre}` : ""}\n💰 Precio: ${fmtCOP(p.precio)}`;
   const waHref = `https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent(msg)}`;
@@ -97,7 +91,7 @@ function ProductoPage() {
             <h2 className="font-display text-3xl md:text-4xl mb-6">Productos similares</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {similares.map(s => (
-                <Link key={s.id} to="/producto/$id" params={{ id: s.id }}
+                <Link key={s.id} to={`/producto/${s.id}`}
                       className="group bg-white border border-[var(--line)] rounded-2xl overflow-hidden hover:border-[var(--gold)] hover:shadow-soft hover:-translate-y-1 transition">
                   <div className="aspect-square bg-[var(--mist)] flex items-center justify-center p-5">
                     {s.imagen

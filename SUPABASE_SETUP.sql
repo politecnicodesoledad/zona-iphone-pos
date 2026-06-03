@@ -9,6 +9,8 @@
 -- =====================================================================
 
 -- Singleton de configuración
+create extension if not exists pgcrypto;
+
 create table if not exists public.zi_config (
   id text primary key default 'singleton',
   data jsonb not null default '{}'::jsonb,
@@ -25,6 +27,14 @@ create table if not exists public.zi_clientes      (id text primary key, data js
 create table if not exists public.zi_proveedores   (id text primary key, data jsonb not null, updated_at timestamptz default now());
 create table if not exists public.zi_empleados     (id text primary key, data jsonb not null, updated_at timestamptz default now());
 create table if not exists public.zi_vendidos      (id text primary key, data jsonb not null, updated_at timestamptz default now());
+
+-- Locales configurables (la app también guarda el estado en zi_config para funcionar rápido en SPA)
+create table if not exists public.zi_locales (
+  id text primary key,
+  nombre text not null,
+  activo boolean not null default true,
+  updated_at timestamptz default now()
+);
 
 create table if not exists public.zi_counters (
   name text primary key,
@@ -57,7 +67,7 @@ begin
     select unnest(array[
       'zi_config','zi_productos','zi_otros','zi_ventas','zi_gastos',
       'zi_clientes','zi_proveedores','zi_empleados','zi_vendidos',
-      'zi_counters','zi_galeria'
+      'zi_counters','zi_galeria','zi_locales'
     ])
   loop
     execute format('grant select, insert, update, delete on public.%I to anon, authenticated', t);
@@ -68,6 +78,10 @@ begin
     execute format($p$create policy "open_all" on public.%I for all using (true) with check (true)$p$, t);
   end loop;
 end $$;
+
+insert into public.zi_locales (id, nombre, activo)
+values ('1', 'Local 1', true), ('2', 'Local 2', true)
+on conflict (id) do nothing;
 
 -- =====================================================================
 -- LISTO ✓

@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   Instagram, Facebook, MessageCircle, Search, MapPin, Clock, Wrench, Menu, X,
   Volume2, VolumeX, ShieldCheck, CreditCard, Truck, Smartphone, ArrowRight, Sparkles, Star,
@@ -8,13 +9,11 @@ import { useConfig, useProductos, useOtros } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
 import type { Producto, ColorOpt } from "@/lib/zi/types";
 
-export const Route = createFileRoute("/")({ component: PublicIndex });
-
 const CAT_LABEL: Record<string, string> = {
   todos: "Todos", iphone: "iPhone", ipad: "iPad", macbook: "MacBook", accesorio: "Accesorios", otro: "Otros",
 };
 
-function PublicIndex() {
+export function PublicIndex() {
   const [cfg] = useConfig();
   const [productos] = useProductos();
   const [otros] = useOtros();
@@ -71,19 +70,19 @@ function PublicIndex() {
         </div>
       )}
 
-      {/* NAV — light, sticky */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[var(--line)]">
+      {/* NAV — black, sticky */}
+      <nav className="sticky top-0 z-50 bg-[var(--ink)] text-white border-b border-white/10 shadow-xl">
         <div className="max-w-7xl mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2.5">
             <img src={cfg.logoUrl} alt="" className="w-10 h-10 rounded-lg" />
             <div className="leading-tight">
-              <div className="font-display text-[var(--ink)] text-xl">ZONA<span className="text-[var(--gold-dark)]">iPHONE</span></div>
-              <div className="text-[9px] text-gray-500 font-semibold tracking-[0.25em]">BARRANQUILLA · CO</div>
+              <div className="font-display text-white text-xl">ZONA<span className="text-[var(--gold)]">iPHONE</span></div>
+              <div className="text-[9px] text-gray-400 font-semibold tracking-[0.25em]">BARRANQUILLA · CO</div>
             </div>
           </Link>
           <div className="hidden md:flex items-center gap-7">
             {[["catalogo","Catálogo"],["servicios","Servicios"],["servicio-tecnico","Técnico"],["ubicacion","Ubicación"]].map(([id,l]) => (
-              <a key={id} href={"#"+id} className="text-[12px] font-semibold text-gray-600 hover:text-[var(--ink)] transition relative after:absolute after:left-0 after:-bottom-1 after:w-0 after:h-[2px] after:bg-[var(--gold)] hover:after:w-full after:transition-all">
+              <a key={id} href={"#"+id} className="text-[12px] font-semibold text-gray-300 hover:text-[var(--gold)] transition relative after:absolute after:left-0 after:-bottom-1 after:w-0 after:h-[2px] after:bg-[var(--gold)] hover:after:w-full after:transition-all">
                 {l}
               </a>
             ))}
@@ -95,32 +94,31 @@ function PublicIndex() {
               <MessageCircle className="w-3.5 h-3.5" /> Escríbenos
             </a>
           </div>
-          <button className="md:hidden w-10 h-10 rounded-lg flex items-center justify-center hover:bg-[var(--mist)]" onClick={() => setMenu(v => !v)}>
+            <button className="md:hidden w-10 h-10 rounded-lg flex items-center justify-center hover:bg-white/10" onClick={() => setMenu(v => !v)}>
             {menu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
         {menu && (
-          <div className="md:hidden bg-white border-t border-[var(--line)] px-4 py-4 flex flex-col gap-3">
+          <div className="md:hidden bg-[var(--ink)] border-t border-white/10 px-4 py-4 flex flex-col gap-3">
             {[["catalogo","Catálogo"],["servicios","Servicios"],["servicio-tecnico","Técnico"],["ubicacion","Ubicación"]].map(([id,l]) => (
-              <a key={id} href={"#"+id} onClick={() => setMenu(false)} className="text-sm text-gray-700 font-semibold py-1.5">{l}</a>
+               <a key={id} href={"#"+id} onClick={() => setMenu(false)} className="text-sm text-gray-200 font-semibold py-1.5">{l}</a>
             ))}
             <a href={waLink("Hola!")} target="_blank" rel="noreferrer" className="zi-btn-gold text-xs mt-2 text-center">Escríbenos por WhatsApp</a>
           </div>
         )}
       </nav>
 
-      {/* HERO — light, editorial */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-white via-[var(--cream)] to-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(201,168,76,0.18),transparent_45%),radial-gradient(circle_at_10%_90%,rgba(201,168,76,0.10),transparent_50%)]" />
-        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-[var(--gold)]/10 blur-3xl" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-16 md:py-28 grid lg:grid-cols-2 gap-10 items-center">
+      {/* HERO — profesional */}
+      <section className="relative overflow-hidden bg-[var(--ink)] text-white">
+        <div className="absolute inset-0 opacity-25 bg-[linear-gradient(120deg,transparent_0%,rgba(201,168,76,.18)_45%,transparent_70%)]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-14 md:py-24 grid lg:grid-cols-[1.05fr_.95fr] gap-10 items-center">
           <div className="animate-fade-up">
-            <span className="zi-chip"><Sparkles className="w-3 h-3" /> Apple Premium Reseller</span>
-            <h1 className="font-display mt-5 leading-[0.95] text-[var(--ink)]" style={{ fontSize: "clamp(54px, 9vw, 120px)" }}>
+            <span className="zi-chip bg-white/10 text-[var(--gold)] border-white/10"><Sparkles className="w-3 h-3" /> {cfg.heroTagline}</span>
+            <h1 className="font-display mt-5 leading-[0.95] text-white" style={{ fontSize: "clamp(54px, 9vw, 120px)" }}>
               {cfg.storeName.split(" ")[0] || "ZONA"}<br />
-              <span className="text-[var(--gold-dark)]">{cfg.storeName.split(" ")[1] || "iPhone"}</span>
+              <span className="text-[var(--gold)]">{cfg.storeName.split(" ")[1] || "iPhone"}</span>
             </h1>
-            <p className="mt-5 text-base md:text-lg text-gray-600 max-w-md leading-relaxed">
+            <p className="mt-5 text-base md:text-lg text-gray-300 max-w-md leading-relaxed">
               {cfg.misionQuote}
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
@@ -134,17 +132,17 @@ function PublicIndex() {
             <div className="mt-10 flex gap-6 flex-wrap">
               {[["+5", "años de confianza"],["1k+","clientes felices"],["100%","garantía"]].map(([n,l]) => (
                 <div key={l}>
-                  <div className="font-display text-3xl text-[var(--ink)]">{n}</div>
-                  <div className="text-[11px] uppercase tracking-[0.15em] text-gray-500 font-semibold">{l}</div>
+                  <div className="font-display text-3xl text-white">{n}</div>
+                  <div className="text-[11px] uppercase tracking-[0.15em] text-gray-400 font-semibold">{l}</div>
                 </div>
               ))}
             </div>
           </div>
           {/* visual */}
-          <div className="relative aspect-square max-w-md mx-auto w-full">
-            <div className="absolute inset-8 bg-gradient-to-br from-[var(--cream)] to-white rounded-[3rem] shadow-soft border border-[var(--line)]" />
-            <div className="absolute inset-0 flex items-center justify-center animate-float">
-              <img src={cfg.logoUrl} alt="" className="w-48 h-48 drop-shadow-2xl" />
+          <div className="relative aspect-[4/5] max-w-md mx-auto w-full">
+            <div className="absolute inset-0 rounded-[2rem] border border-white/10 bg-white/[.04] shadow-2xl" />
+            <div className="absolute inset-5 flex items-center justify-center animate-float overflow-hidden rounded-[1.5rem] bg-white">
+              <img src={cfg.heroImageUrl || cfg.logoUrl} alt="Zona iPhone" className="h-full w-full object-contain p-8 drop-shadow-2xl" />
             </div>
             <div className="absolute top-6 right-2 bg-white rounded-2xl shadow-soft border border-[var(--line)] p-3 animate-float" style={{ animationDelay: "1s" }}>
               <div className="flex items-center gap-2">
@@ -421,7 +419,7 @@ function PublicIndex() {
   );
 }
 
-function SocialIcon({ href, children }: { href: string; children: React.ReactNode }) {
+function SocialIcon({ href, children }: { href: string; children: ReactNode }) {
   return (
     <a href={href} target="_blank" rel="noreferrer"
        className="w-9 h-9 rounded-lg border border-[var(--line)] text-gray-500 flex items-center justify-center hover:border-[var(--gold)] hover:text-[var(--gold-dark)] hover:bg-[var(--cream)] transition">
@@ -444,15 +442,15 @@ function ProductCard({ p, onQuote, promoId, promoPrice }: { p: Producto; onQuote
   const displayPrice = isPromo ? promoPrice : p.precio;
   return (
     <div className="group bg-white border border-[var(--line)] rounded-2xl overflow-hidden hover:border-[var(--gold)] hover:shadow-soft hover:-translate-y-1 transition-all duration-300">
-      <div className="relative aspect-square bg-[var(--mist)] flex items-center justify-center p-5 overflow-hidden">
+      <Link to={`/producto/${p.id}`} className="relative aspect-square bg-[var(--mist)] flex items-center justify-center p-5 overflow-hidden">
         {p.imagen
           ? <img src={p.imagen} alt={p.nombre} className="max-h-full object-contain group-hover:scale-105 transition duration-500" />
           : <Smartphone className="w-16 h-16 text-gray-300" />}
         <span className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-[0.1em] ${BADGE_CLR[p.estado]}`}>{p.estado}</span>
         {isPromo && <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md bg-red-600 text-white text-[9px] font-bold animate-pulse">PROMO</span>}
-      </div>
+      </Link>
       <div className="p-4">
-        <h3 className="font-bold text-sm truncate text-[var(--ink)]">{p.nombre}</h3>
+        <Link to={`/producto/${p.id}`} className="block font-bold text-sm truncate text-[var(--ink)] hover:text-[var(--gold-dark)]">{p.nombre}</Link>
         <p className="text-xs text-gray-500 truncate mt-0.5">{p.descripcion || p.categoria}</p>
         {p.colores && p.colores.length > 0 && (
           <div className="flex gap-1.5 mt-2.5">

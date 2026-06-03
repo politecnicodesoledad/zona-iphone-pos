@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useVentas, useGastos, useConfig, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, fmtDateTime, rangeFor, type Periodo, maskCedula } from "@/lib/zi/format";
 import { generarFacturaPDF, exportarHistorialPDF } from "@/lib/zi/pdf";
+import { exportarVentasExcel } from "@/lib/zi/excel";
 import { Card, Btn, Input, Select, Tabs, Field, Modal, Stat } from "./ui";
 import { Trash2, Printer, MessageCircle, Download } from "lucide-react";
 import type { Venta, Gasto } from "@/lib/zi/types";
@@ -13,11 +14,9 @@ export function Finanzas() {
       <Tabs tabs={[
         { id: "historial", label: "📋 Historial" },
         { id: "canceladas", label: "🚫 Canceladas" },
-        { id: "gastos", label: "💸 Gastos" },
       ]} active={tab} onChange={setTab} />
       {tab === "historial" && <Historial />}
       {tab === "canceladas" && <Canceladas />}
-      {tab === "gastos" && <Gastos />}
     </div>
   );
 }
@@ -74,6 +73,14 @@ function Historial() {
             title={list.length === 0 ? "No hay ventas para exportar" : "Descargar PDF del historial filtrado"}
           >
             <Download className="inline w-3.5 h-3.5 mr-1" /> Exportar PDF
+          </Btn>
+          <Btn
+            variant="ink"
+            onClick={() => exportarVentasExcel(list)}
+            disabled={list.length === 0}
+            title={list.length === 0 ? "No hay ventas para exportar" : "Descargar Excel del historial filtrado"}
+          >
+            <Download className="inline w-3.5 h-3.5 mr-1" /> Excel
           </Btn>
         </div>
       </Card>
@@ -207,7 +214,7 @@ function Canceladas() {
   );
 }
 
-function Gastos() {
+export function Gastos() {
   const [gastos, setGastos] = useGastos();
   const [periodo, setPeriodo] = useState<Periodo>("todos");
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
