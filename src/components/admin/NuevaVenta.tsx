@@ -1,14 +1,14 @@
 import { useState, useMemo } from "react";
 import { useProductos, useVentas, useGastos, useClientes, useFacturaNum, useConfig, useVendidos, Store, uid, fmtFactura } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
-import { generarFacturaPDF } from "@/lib/zi/pdf";
+import { facturaWhatsappText, generarFacturaPDF } from "@/lib/zi/pdf";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field } from "./ui";
 import type { VentaProducto, Venta, Producto } from "@/lib/zi/types";
-import { Trash2, Search, Plus } from "lucide-react";
+import { Trash2, Search, Plus, MessageCircle } from "lucide-react";
 
 interface Item extends VentaProducto { id: string; precioBase: number; }
 
-export function NuevaVenta() {
+export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [productos] = useProductos();
   const [, setVentas] = useVentas();
   const [, setGastos] = useGastos();
@@ -42,8 +42,14 @@ export function NuevaVenta() {
 
   const [obs, setObs] = useState("");
   const [ultimaVenta, setUltima] = useState<Venta | null>(null);
+  const [fechaFactura, setFechaFactura] = useState(() => new Date().toISOString().slice(0, 16));
+  const [pinFecha, setPinFecha] = useState("");
 
-  const matches = useMemo(() => search ? productos.filter(p => p.stock > 0 && p.nombre.toLowerCase().includes(search.toLowerCase())).slice(0, 6) : [], [productos, search]);
+  const disponibles = useMemo(() => productos.filter(p => p.stock > 0), [productos]);
+  const matches = useMemo(() => {
+    const base = search ? disponibles.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase())) : disponibles;
+    return base.slice(0, search ? 8 : 12);
+  }, [disponibles, search]);
   const total = items.reduce((s, i) => s + i.subtotal, 0);
   const descuentoTotal = items.reduce((s, i) => s + (i.descuento || 0), 0);
   const cValorCuota = cCuotas > 0 ? (total - cInicial) / cCuotas : 0;
@@ -76,20 +82,30 @@ export function NuevaVenta() {
   }
   function removeItem(id: string) { setItems(prev => prev.filter(i => i.id !== id)); }
 
-  function finalizar() {
+  async function finalizar() {
     if (items.length === 0) { alert("Agrega al menos un producto"); return; }
-    const factura = fmtFactura(num);
+    const requiereCliente = tipoPago === "credito" || tipoPago === "tradein";
+    if (requiereCliente && (!cNombre.trim() || !cTel.trim() || !cCedula.trim())) {
+      alert("Para crédito o celular como parte de pago debes registrar nombre, teléfono y cédula."); return;
+    }
+    if (retroMode && pinFecha !== "0011") { alert("PIN incorrecto para registrar venta con fecha manual"); return; }
+    const fechaVenta = retroMode ? new Date(fechaFactura).getTime() : Date.now();
+    if (!Number.isFinite(fechaVenta)) { alert("Fecha inválida"); return; }
+    const { nextFacturaNumber } = await import("@/lib/zi/cloud-sync");
+    const facturaNum = await nextFacturaNumber(num);
+    const factura = fmtFactura(facturaNum);
     const venta: Venta = {
-      id: uid(), factura, fecha: Date.now(), tipo: tipoPago, local, asesor,
+      id: uid(), factura, fecha: fechaVenta, registradaEn: Date.now(), fechaManual: retroMode, tipo: tipoPago, local, asesor,
       productos: items.map(({ id: _id, precioBase: _pb, ...rest }) => rest),
       total, descuentoTotal, observaciones: obs,
+      ...((cNombre || cTel || cCedula) && { cliente: { nombre: cNombre.trim(), cedula: cCedula.trim(), telefono: cTel.trim() } }),
       ...(tipoPago === "contado" && { metodoPago: metodo, recibido }),
       ...(tipoPago === "credito" && {
         cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel },
         creditoCuotas: cCuotas, creditoCuotaInicial: cInicial, creditoValorCuota: cValorCuota,
       }),
       ...(tipoPago === "tradein" && {
-        cliente: { nombre: cNombre },
+        cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel },
         tradeIn: { marca: tMarca, modelo: tModelo, imei: tImei, valor: tValor, restante: tRestante, metodoRestante: tMetodo },
       }),
     };
@@ -107,7 +123,6 @@ export function NuevaVenta() {
             id: uid(), nombre: p.nombre, categoria: p.categoria, costo: p.costo, precio: p.precio,
             gananciaPotencial: (p.precio - p.costo), fechaArchivado: Date.now(), original: p,
           });
-          psNew.splice(idx, 1);
         }
       }
     });
@@ -115,7 +130,7 @@ export function NuevaVenta() {
     Store.setVendidos(vendidosArr);
 
     setVentas(prev => [...prev, venta]);
-    setNum(num + 1);
+    setNum(Math.max(num, facturaNum) + 1);
 
     // CRM crédito
     if (tipoPago === "credito" && cNombre) {
@@ -137,7 +152,7 @@ export function NuevaVenta() {
     }
     setUltima(venta);
     // reset
-    setItems([]); setObs(""); setRecibido(0);
+    setItems([]); setObs(""); setRecibido(0); setPinFecha(""); setFechaFactura(new Date().toISOString().slice(0, 16));
     setCNombre(""); setCCedula(""); setCTel(""); setCInicial(0); setCCuotas(3);
     setTMarca(""); setTModelo(""); setTImei(""); setTValor(0);
     alert(`Venta ${factura} guardada ✓`);
@@ -146,6 +161,11 @@ export function NuevaVenta() {
   function imprimir() {
     if (!ultimaVenta) return alert("Primero finaliza una venta");
     generarFacturaPDF(ultimaVenta, cfg);
+  }
+  function enviarWhatsapp() {
+    if (!ultimaVenta) return alert("Primero finaliza una venta");
+    const phone = (ultimaVenta.cliente?.telefono || cfg.whatsapp).replace(/\D/g, "");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(facturaWhatsappText(ultimaVenta, cfg))}`, "_blank");
   }
 
   function cancelar() {
@@ -164,6 +184,7 @@ export function NuevaVenta() {
               <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del producto..." className="pl-9" />
             </div>
           </Field>
+          <div className="mt-2 text-[10px] uppercase tracking-widest text-gray-400 font-bold">{search ? "Resultados" : "Selecciona del inventario"}</div>
           {matches.length > 0 && (
             <div className="mt-2 border border-[var(--line)] rounded-lg divide-y divide-white/5">
               {matches.map(p => (
@@ -175,6 +196,25 @@ export function NuevaVenta() {
             </div>
           )}
         </Card>
+
+        <Card>
+          <h3 className="font-display text-xl text-[var(--gold)] mb-3">Datos del cliente</h3>
+          <div className="grid md:grid-cols-3 gap-3">
+            <Field label={tipoPago === "contado" ? "Nombre (opcional)" : "Nombre (obligatorio)"}><Input value={cNombre} onChange={e => setCNombre(e.target.value)} placeholder="Nombre del cliente" /></Field>
+            <Field label={tipoPago === "contado" ? "Teléfono (opcional)" : "Teléfono (obligatorio)"}><Input value={cTel} onChange={e => setCTel(e.target.value.replace(/\D/g,""))} placeholder="300..." /></Field>
+            <Field label={tipoPago === "contado" ? "Cédula (opcional)" : "Cédula (obligatoria)"}><Input value={cCedula} onChange={e => setCCedula(e.target.value.replace(/\D/g,""))} placeholder="CC / NIT" /></Field>
+          </div>
+        </Card>
+
+        {retroMode && (
+          <Card className="border-amber-200 bg-amber-50">
+            <h3 className="font-display text-xl text-amber-900 mb-3">Venta con fecha manual</h3>
+            <div className="grid md:grid-cols-2 gap-3">
+              <Field label="Fecha y hora real de la factura"><Input type="datetime-local" value={fechaFactura} onChange={e => setFechaFactura(e.target.value)} /></Field>
+              <Field label="PIN requerido"><Input type="password" maxLength={4} value={pinFecha} onChange={e => setPinFecha(e.target.value.replace(/\D/g,""))} placeholder="0011" /></Field>
+            </div>
+          </Card>
+        )}
 
         <Card className="border-[var(--gold)]/30 bg-[var(--cream)]/60">
           <h3 className="font-display text-xl text-[var(--gold-dark)] mb-3">Venta rápida personalizada</h3>
@@ -239,9 +279,6 @@ export function NuevaVenta() {
           )}
           {tipoPago === "credito" && (
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Nombre"><Input value={cNombre} onChange={e => setCNombre(e.target.value)} /></Field>
-              <Field label="Cédula"><Input value={cCedula} onChange={e => setCCedula(e.target.value)} /></Field>
-              <Field label="Teléfono"><Input value={cTel} onChange={e => setCTel(e.target.value.replace(/\D/g,""))} /></Field>
               <Field label="Cuota inicial"><Input type="number" value={cInicial} onChange={e => setCInicial(+e.target.value || 0)} /></Field>
               <Field label="# Cuotas"><Input type="number" min={1} value={cCuotas} onChange={e => setCCuotas(Math.max(1, +e.target.value))} /></Field>
               <Field label="Valor por cuota"><div className="px-3 py-2 text-[var(--gold)] font-bold">{fmtCOP(cValorCuota)}</div></Field>
@@ -250,7 +287,6 @@ export function NuevaVenta() {
           )}
           {tipoPago === "tradein" && (
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Cliente"><Input value={cNombre} onChange={e => setCNombre(e.target.value)} /></Field>
               <Field label="Marca del cel"><Input value={tMarca} onChange={e => setTMarca(e.target.value)} /></Field>
               <Field label="Modelo"><Input value={tModelo} onChange={e => setTModelo(e.target.value)} /></Field>
               <Field label="IMEI (opcional)"><Input value={tImei} onChange={e => setTImei(e.target.value)} /></Field>
@@ -283,6 +319,7 @@ export function NuevaVenta() {
         </Card>
         <Btn onClick={finalizar} className="w-full py-4 text-base"><Plus className="inline w-4 h-4 -mt-0.5" /> Finalizar venta</Btn>
         <Btn variant="ghost" onClick={imprimir} className="w-full">🖨 Imprimir factura</Btn>
+        <Btn variant="ok" onClick={enviarWhatsapp} className="w-full"><MessageCircle className="inline w-4 h-4 -mt-0.5" /> Enviar factura WhatsApp</Btn>
         <Btn variant="danger" onClick={cancelar} className="w-full">❌ Cancelar venta</Btn>
         {ultimaVenta && (
           <Card>

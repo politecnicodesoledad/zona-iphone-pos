@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useProductos, useOtros, useGastos, useVendidos, useConfig, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate } from "@/lib/zi/format";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field, Modal, Stat } from "./ui";
 import type { Producto, Categoria, EstadoProducto, CostoOrigen, ColorOpt } from "@/lib/zi/types";
 import { Trash2, Plus, RotateCcw, Edit, ImagePlus, Link as LinkIcon, Upload } from "lucide-react";
 import { GALERIA_IPHONE } from "@/lib/zi/galeria-iphone";
+import { addCustomGallery, pullCustomGallery, readCustomGallery, removeCustomGallery } from "@/lib/zi/gallery-store";
 
 export function Inventario() {
   const [tab, setTab] = useState("productos");
@@ -116,10 +117,14 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
   const [cfg] = useConfig();
   const [imageMode, setImageMode] = useState<"galeria" | "link" | "archivo">("galeria");
   const [galleryQ, setGalleryQ] = useState(value.nombre || "");
+  const [customGallery, setCustomGallery] = useState(readCustomGallery());
+  const [newImg, setNewImg] = useState({ modelo: "", color: "", url: "" });
   const ganancia = value.precio - value.costo;
   const margen = value.precio > 0 ? (ganancia / value.precio) * 100 : 0;
   const showImei = !hideImei && ["iphone", "ipad", "macbook"].includes(value.categoria);
-  const galleryItems = GALERIA_IPHONE.filter(g => `${g.modelo} ${g.color}`.toLowerCase().includes(galleryQ.toLowerCase())).slice(0, 18);
+  const galleryItems = [...customGallery, ...GALERIA_IPHONE].filter(g => `${g.modelo} ${g.color}`.toLowerCase().includes(galleryQ.toLowerCase())).slice(0, 24);
+
+  useEffect(() => { pullCustomGallery().then(setCustomGallery); }, []);
 
   function addColor() {
     onChange({ ...value, colores: [...(value.colores || []), { nombre: "Color", hex: "#000000" }] });
@@ -131,6 +136,15 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
     const reader = new FileReader();
     reader.onload = () => onChange({ ...value, imagen: reader.result as string });
     reader.readAsDataURL(f);
+  }
+  async function addGalleryImage() {
+    if (!newImg.modelo.trim() || !newImg.url.trim()) return alert("Escribe modelo y URL de imagen");
+    await addCustomGallery({ modelo: newImg.modelo.trim(), color: newImg.color.trim(), url: newImg.url.trim() });
+    setCustomGallery(readCustomGallery()); setNewImg({ modelo: "", color: "", url: "" });
+  }
+  async function delGalleryImage(id?: string) {
+    if (!id || !confirm("¿Eliminar esta imagen de la galería personalizada?")) return;
+    await removeCustomGallery(id); setCustomGallery(readCustomGallery());
   }
 
   return (
@@ -162,7 +176,7 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
           </div>
           {imageMode === "link" && <Input value={value.imagen || ""} onChange={e => onChange({ ...value, imagen: e.target.value })} placeholder="https://..." />}
           {imageMode === "archivo" && <label className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[var(--gold)] bg-white text-center text-xs text-gray-500 hover:bg-[var(--cream)]"><Upload className="mb-2 h-5 w-5 text-[var(--gold-dark)]" />Subir imagen desde archivos<input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0])} /></label>}
-          {imageMode === "galeria" && <div className="space-y-3"><Input value={galleryQ} onChange={e => setGalleryQ(e.target.value)} placeholder="Buscar modelo/color" /><div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">{galleryItems.map(g => <button key={`${g.modelo}-${g.color}`} type="button" onClick={() => onChange({ ...value, imagen: g.url, nombre: value.nombre || g.modelo })} className={`rounded-xl border bg-white p-2 text-left hover:border-[var(--gold)] hover:shadow-soft transition ${value.imagen === g.url ? "border-[var(--gold)] ring-2 ring-[var(--gold)]/20" : "border-[var(--line)]"}`}><div className="h-16 w-full rounded-lg bg-[var(--mist)] flex items-center justify-center overflow-hidden"><img src={g.url} alt={`${g.modelo} ${g.color}`} className="h-full w-full object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} /><ImagePlus className="absolute h-6 w-6 text-gray-300" /></div><div className="mt-1 truncate text-[10px] font-bold">{g.modelo}</div><div className="truncate text-[9px] text-gray-500">{g.color}</div></button>)}</div></div>}
+          {imageMode === "galeria" && <div className="space-y-3"><Input value={galleryQ} onChange={e => setGalleryQ(e.target.value)} placeholder="Buscar modelo/color" /><div className="grid md:grid-cols-[1fr_120px] gap-2"><Input value={newImg.modelo} onChange={e => setNewImg({ ...newImg, modelo: e.target.value })} placeholder="Modelo nuevo" /><Input value={newImg.color} onChange={e => setNewImg({ ...newImg, color: e.target.value })} placeholder="Color" /><Input value={newImg.url} onChange={e => setNewImg({ ...newImg, url: e.target.value })} placeholder="URL de imagen" className="md:col-span-1" /><Btn type="button" variant="ghost" onClick={addGalleryImage}>Agregar foto</Btn></div><div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">{galleryItems.map(g => { const customId = (g as any).id as string | undefined; return <div key={`${g.modelo}-${g.color}-${g.url}`} className="relative group"><button type="button" onClick={() => onChange({ ...value, imagen: g.url, nombre: value.nombre || g.modelo })} className={`w-full rounded-xl border bg-white p-2 text-left hover:border-[var(--gold)] hover:shadow-soft transition ${value.imagen === g.url ? "border-[var(--gold)] ring-2 ring-[var(--gold)]/20" : "border-[var(--line)]"}`}><div className="h-16 w-full rounded-lg bg-[var(--mist)] flex items-center justify-center overflow-hidden"><img src={g.url} alt={`${g.modelo} ${g.color}`} className="h-full w-full object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} /><ImagePlus className="absolute h-6 w-6 text-gray-300" /></div><div className="mt-1 truncate text-[10px] font-bold">{g.modelo}</div><div className="truncate text-[9px] text-gray-500">{g.color}</div></button>{customId && <button type="button" onClick={() => delGalleryImage(customId)} className="absolute -right-1 -top-1 hidden group-hover:flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow"><Trash2 className="h-3 w-3" /></button>}</div>; })}</div></div>}
         </div>
       </Field>
 

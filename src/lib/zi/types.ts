@@ -50,6 +50,8 @@ export interface Venta {
   id: string;
   factura: string; // #00001
   fecha: number;
+  registradaEn?: number;
+  fechaManual?: boolean;
   tipo: "contado" | "credito" | "tradein";
   local: 1 | 2;
   asesor?: string;

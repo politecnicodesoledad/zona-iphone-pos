@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { Route, Routes } from "react-router-dom";
-import { Store } from "@/lib/zi/store";
+import { Store, useCloudBoot } from "@/lib/zi/store";
 import { PublicIndex } from "@/routes/index";
 import { AdminPage } from "@/routes/admin";
 import { ProductoPage } from "@/routes/producto.$id";
@@ -36,6 +36,7 @@ function NotFound() {
 }
 
 export default function App() {
+  useCloudBoot();
   const cfg = Store.config();
   return (
     <>
@@ -55,7 +56,7 @@ export default function App() {
       <EventTheme />
       <Routes>
         <Route path="/" element={<PublicIndex />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/pos" element={<AdminPage />} />
         <Route path="/producto/:id" element={<ProductoPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
