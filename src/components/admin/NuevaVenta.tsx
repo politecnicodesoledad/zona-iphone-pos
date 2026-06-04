@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useProductos, useVentas, useGastos, useClientes, useFacturaNum, useConfig, useVendidos, Store, uid, fmtFactura } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
-import { generarFacturaPDF } from "@/lib/zi/pdf";
+import { facturaWhatsappText, generarFacturaPDF } from "@/lib/zi/pdf";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field } from "./ui";
 import type { VentaProducto, Venta, Producto } from "@/lib/zi/types";
-import { Trash2, Search, Plus } from "lucide-react";
+import { Trash2, Search, Plus, MessageCircle } from "lucide-react";
 
 interface Item extends VentaProducto { id: string; precioBase: number; }
 
@@ -161,6 +161,11 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     if (!ultimaVenta) return alert("Primero finaliza una venta");
     generarFacturaPDF(ultimaVenta, cfg);
   }
+  function enviarWhatsapp() {
+    if (!ultimaVenta) return alert("Primero finaliza una venta");
+    const phone = (ultimaVenta.cliente?.telefono || cfg.whatsapp).replace(/\D/g, "");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(facturaWhatsappText(ultimaVenta, cfg))}`, "_blank");
+  }
 
   function cancelar() {
     const pin = prompt("PIN de cancelación (4 dígitos):");
@@ -313,6 +318,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
         </Card>
         <Btn onClick={finalizar} className="w-full py-4 text-base"><Plus className="inline w-4 h-4 -mt-0.5" /> Finalizar venta</Btn>
         <Btn variant="ghost" onClick={imprimir} className="w-full">🖨 Imprimir factura</Btn>
+        <Btn variant="ok" onClick={enviarWhatsapp} className="w-full"><MessageCircle className="inline w-4 h-4 -mt-0.5" /> Enviar factura WhatsApp</Btn>
         <Btn variant="danger" onClick={cancelar} className="w-full">❌ Cancelar venta</Btn>
         {ultimaVenta && (
           <Card>
