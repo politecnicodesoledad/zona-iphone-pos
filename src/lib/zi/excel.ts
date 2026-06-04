@@ -25,11 +25,10 @@ export function exportarVentasExcel(ventas: Venta[], filename = "historial-venta
       v.factura,
       v.asesor || "—",
       v.fechaManual ? "Fecha manual" : "Normal",
-      v.productos.map(p => p.nombre).join(", "),
       v.cancelada ? "Cancelada" : "Activa",
     ];
   });
-  const head = ["Fecha", "Hora", "Cliente", "Teléfono", "Cédula", "Local", "Tipo pago", "Método", "Productos", "Total Venta", "Costo Total", "Ganancia", "Observaciones", "Factura", "Asesor", "Registro", "Producto(s)", "Estado"];
+  const head = ["Fecha", "Hora", "Cliente", "Teléfono", "Cédula", "Local", "Tipo pago", "Método", "Productos", "Total Venta", "Costo Total", "Ganancia", "Observaciones", "Factura", "Asesor", "Registro", "Estado"];
   const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body><table border="1"><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const url = URL.createObjectURL(blob);
