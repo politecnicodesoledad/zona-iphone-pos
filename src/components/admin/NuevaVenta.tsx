@@ -82,7 +82,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   }
   function removeItem(id: string) { setItems(prev => prev.filter(i => i.id !== id)); }
 
-  function finalizar() {
+  async function finalizar() {
     if (items.length === 0) { alert("Agrega al menos un producto"); return; }
     const requiereCliente = tipoPago === "credito" || tipoPago === "tradein";
     if (requiereCliente && (!cNombre.trim() || !cTel.trim() || !cCedula.trim())) {
@@ -91,7 +91,9 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     if (retroMode && pinFecha !== "0011") { alert("PIN incorrecto para registrar venta con fecha manual"); return; }
     const fechaVenta = retroMode ? new Date(fechaFactura).getTime() : Date.now();
     if (!Number.isFinite(fechaVenta)) { alert("Fecha inválida"); return; }
-    const factura = fmtFactura(num);
+    const { nextFacturaNumber } = await import("@/lib/zi/cloud-sync");
+    const facturaNum = await nextFacturaNumber(num);
+    const factura = fmtFactura(facturaNum);
     const venta: Venta = {
       id: uid(), factura, fecha: fechaVenta, registradaEn: Date.now(), fechaManual: retroMode, tipo: tipoPago, local, asesor,
       productos: items.map(({ id: _id, precioBase: _pb, ...rest }) => rest),
@@ -129,7 +131,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     Store.setVendidos(vendidosArr);
 
     setVentas(prev => [...prev, venta]);
-    setNum(num + 1);
+    setNum(Math.max(num, facturaNum) + 1);
 
     // CRM crédito
     if (tipoPago === "credito" && cNombre) {
