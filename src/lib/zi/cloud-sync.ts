@@ -2,7 +2,7 @@
 // Modelo: cada colección se sube/baja como filas { id, data: {...entidad} }.
 import { ziSupabase, ziCloudReady } from "@/integrations/supabase/zi-client";
 import { Store, DEFAULT_CONFIG } from "./store";
-import type { Venta } from "./types";
+import type { Venta, ZIConfig } from "./types";
 
 const COLLECTIONS = [
   { key: "productos", get: () => Store.productos(), set: (v: any[]) => Store.setProductos(v as any) },
@@ -15,6 +15,8 @@ const COLLECTIONS = [
 // Estas tres no tienen helpers en Store; las leemos directo de localStorage.
 const RAW_COLLECTIONS = ["otros", "proveedores", "empleados"] as const;
 
+let applyingCloud = false;
+
 function readLS<T = unknown>(key: string): T[] {
   try { return JSON.parse(localStorage.getItem(`zi_${key}`) || "[]") as T[]; } catch { return []; }
 }
@@ -24,6 +26,30 @@ function writeLS(key: string, v: unknown) {
 }
 
 export interface SyncReport { ok: boolean; message: string; details?: string[] }
+
+function upsertRows(key: string, items: any[]) {
+  const rows = items.filter((it) => it?.id).map((it) => ({
+    id: it.id,
+    data: it,
+    ...(key === "ventas" ? { fecha: new Date((it as Venta).fecha).toISOString() } : {}),
+    updated_at: new Date().toISOString(),
+  }));
+  return rows.length ? ziSupabase.from(`zi_${key}`).upsert(rows) : Promise.resolve({ error: null } as any);
+}
+
+export async function pushConfigToCloud(cfg: ZIConfig) {
+  if (applyingCloud || !(await ziCloudReady())) return;
+  await ziSupabase.from("zi_config").upsert({ id: "singleton", data: cfg, updated_at: new Date().toISOString() });
+}
+
+export async function pushCollectionToCloud(key: string, value: unknown) {
+  if (applyingCloud || !(await ziCloudReady())) return;
+  if (key === "facturaNum") {
+    await ziSupabase.from("zi_counters").upsert({ name: "factura", value: Number(value) || 1, updated_at: new Date().toISOString() });
+    return;
+  }
+  if (Array.isArray(value)) await upsertRows(key, value);
+}
 
 export async function pushAllToCloud(): Promise<SyncReport> {
   if (!(await ziCloudReady())) {
@@ -43,12 +69,7 @@ export async function pushAllToCloud(): Promise<SyncReport> {
     for (const c of COLLECTIONS) {
       const items = c.get();
       if (items.length === 0) { details.push(`· ${c.key}: vacío`); continue; }
-      const rows = items.map((it: any) => ({
-        id: it.id,
-        data: it,
-        ...(c.key === "ventas" ? { fecha: new Date((it as Venta).fecha).toISOString() } : {}),
-      }));
-      const { error } = await ziSupabase.from(`zi_${c.key}`).upsert(rows);
+      const { error } = await upsertRows(c.key, items);
       if (error) throw new Error(`${c.key}: ${error.message}`);
       details.push(`✓ ${c.key}: ${items.length}`);
     }
@@ -66,12 +87,20 @@ export async function pushAllToCloud(): Promise<SyncReport> {
   }
 }
 
-export async function pullAllFromCloud(): Promise<SyncReport> {
+function mergeById<T extends { id: string }>(local: T[], remote: T[]) {
+  const m = new Map<string, T>();
+  local.forEach((it) => it?.id && m.set(it.id, it));
+  remote.forEach((it) => it?.id && m.set(it.id, it));
+  return Array.from(m.values());
+}
+
+export async function pullAllFromCloud(options: { merge?: boolean; silent?: boolean } = {}): Promise<SyncReport> {
   if (!(await ziCloudReady())) {
     return { ok: false, message: "El schema no está creado en Supabase. Pega SUPABASE_SETUP.sql primero." };
   }
   const details: string[] = [];
   try {
+    applyingCloud = true;
     const { data: cfgRow } = await ziSupabase.from("zi_config").select("data").eq("id", "singleton").maybeSingle();
     if (cfgRow?.data) {
       localStorage.setItem("zi_config", JSON.stringify({ ...DEFAULT_CONFIG, ...cfgRow.data }));
@@ -83,14 +112,16 @@ export async function pullAllFromCloud(): Promise<SyncReport> {
     for (const c of COLLECTIONS) {
       const { data, error } = await ziSupabase.from(`zi_${c.key}`).select("data");
       if (error) throw new Error(`${c.key}: ${error.message}`);
-      const arr = (data || []).map((r: any) => r.data);
+      const remote = (data || []).map((r: any) => r.data);
+      const arr = options.merge ? mergeById(c.get() as any[], remote) : remote;
       c.set(arr);
       details.push(`✓ ${c.key}: ${arr.length}`);
     }
     for (const k of RAW_COLLECTIONS) {
       const { data, error } = await ziSupabase.from(`zi_${k}`).select("data");
       if (error) throw new Error(`${k}: ${error.message}`);
-      const arr = (data || []).map((r: any) => r.data);
+      const remote = (data || []).map((r: any) => r.data);
+      const arr = options.merge ? mergeById(readLS(k), remote) : remote;
       writeLS(k, arr);
       details.push(`✓ ${k}: ${arr.length}`);
     }
@@ -98,5 +129,7 @@ export async function pullAllFromCloud(): Promise<SyncReport> {
     return { ok: true, message: "Datos bajados de la nube ✓", details };
   } catch (e: any) {
     return { ok: false, message: e.message || String(e), details };
+  } finally {
+    applyingCloud = false;
   }
 }
