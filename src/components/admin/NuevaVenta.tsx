@@ -178,6 +178,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
               <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del producto..." className="pl-9" />
             </div>
           </Field>
+          <div className="mt-2 text-[10px] uppercase tracking-widest text-gray-400 font-bold">{search ? "Resultados" : "Selecciona del inventario"}</div>
           {matches.length > 0 && (
             <div className="mt-2 border border-[var(--line)] rounded-lg divide-y divide-white/5">
               {matches.map(p => (
@@ -189,6 +190,25 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
             </div>
           )}
         </Card>
+
+        <Card>
+          <h3 className="font-display text-xl text-[var(--gold)] mb-3">Datos del cliente</h3>
+          <div className="grid md:grid-cols-3 gap-3">
+            <Field label={tipoPago === "contado" ? "Nombre (opcional)" : "Nombre (obligatorio)"}><Input value={cNombre} onChange={e => setCNombre(e.target.value)} placeholder="Nombre del cliente" /></Field>
+            <Field label={tipoPago === "contado" ? "Teléfono (opcional)" : "Teléfono (obligatorio)"}><Input value={cTel} onChange={e => setCTel(e.target.value.replace(/\D/g,""))} placeholder="300..." /></Field>
+            <Field label={tipoPago === "contado" ? "Cédula (opcional)" : "Cédula (obligatoria)"}><Input value={cCedula} onChange={e => setCCedula(e.target.value.replace(/\D/g,""))} placeholder="CC / NIT" /></Field>
+          </div>
+        </Card>
+
+        {retroMode && (
+          <Card className="border-amber-200 bg-amber-50">
+            <h3 className="font-display text-xl text-amber-900 mb-3">Venta con fecha manual</h3>
+            <div className="grid md:grid-cols-2 gap-3">
+              <Field label="Fecha y hora real de la factura"><Input type="datetime-local" value={fechaFactura} onChange={e => setFechaFactura(e.target.value)} /></Field>
+              <Field label="PIN requerido"><Input type="password" maxLength={4} value={pinFecha} onChange={e => setPinFecha(e.target.value.replace(/\D/g,""))} placeholder="0011" /></Field>
+            </div>
+          </Card>
+        )}
 
         <Card className="border-[var(--gold)]/30 bg-[var(--cream)]/60">
           <h3 className="font-display text-xl text-[var(--gold-dark)] mb-3">Venta rápida personalizada</h3>
@@ -253,9 +273,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
           )}
           {tipoPago === "credito" && (
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Nombre"><Input value={cNombre} onChange={e => setCNombre(e.target.value)} /></Field>
-              <Field label="Cédula"><Input value={cCedula} onChange={e => setCCedula(e.target.value)} /></Field>
-              <Field label="Teléfono"><Input value={cTel} onChange={e => setCTel(e.target.value.replace(/\D/g,""))} /></Field>
               <Field label="Cuota inicial"><Input type="number" value={cInicial} onChange={e => setCInicial(+e.target.value || 0)} /></Field>
               <Field label="# Cuotas"><Input type="number" min={1} value={cCuotas} onChange={e => setCCuotas(Math.max(1, +e.target.value))} /></Field>
               <Field label="Valor por cuota"><div className="px-3 py-2 text-[var(--gold)] font-bold">{fmtCOP(cValorCuota)}</div></Field>
@@ -264,7 +281,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
           )}
           {tipoPago === "tradein" && (
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Cliente"><Input value={cNombre} onChange={e => setCNombre(e.target.value)} /></Field>
               <Field label="Marca del cel"><Input value={tMarca} onChange={e => setTMarca(e.target.value)} /></Field>
               <Field label="Modelo"><Input value={tModelo} onChange={e => setTModelo(e.target.value)} /></Field>
               <Field label="IMEI (opcional)"><Input value={tImei} onChange={e => setTImei(e.target.value)} /></Field>
