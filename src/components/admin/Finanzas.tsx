@@ -210,7 +210,7 @@ function Canceladas() {
       <Card>
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-display text-xl text-[var(--gold)]">Historial de canceladas</h3>
-          {cancel.length > 0 && <Btn variant="danger" onClick={() => { if (confirm("¿Vaciar todas las canceladas?")) setVentas(prev => prev.filter(v => !v.cancelada)); }}>🗑 Vaciar historial</Btn>}
+          <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Conservado para auditoría</span>
         </div>
         {cancel.length === 0 ? <p className="text-sm text-gray-500">No hay ventas canceladas.</p> : (
           <table className="w-full text-sm">
@@ -225,7 +225,7 @@ function Canceladas() {
                   <td className="text-xs">{v.cliente?.nombre || "—"}</td>
                   <td className="text-right line-through text-gray-500">{fmtCOP(v.total)}</td>
                   <td><span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] rounded font-bold">CANCELADA</span></td>
-                  <td className="text-right"><button onClick={() => setVentas(prev => prev.filter(x => x.id !== v.id))} className="text-red-600 px-2"><Trash2 className="w-4 h-4" /></button></td>
+                  <td className="text-right text-[10px] text-gray-400">No se elimina</td>
                 </tr>
               ))}
             </tbody>
