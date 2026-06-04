@@ -42,6 +42,25 @@ create table if not exists public.zi_counters (
   updated_at timestamptz default now()
 );
 
+create or replace function public.zi_next_factura()
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare n int;
+begin
+  insert into public.zi_counters (name, value, updated_at)
+  values ('factura', 2, now())
+  on conflict (name) do update
+    set value = public.zi_counters.value + 1,
+        updated_at = now()
+  returning value - 1 into n;
+  return n;
+end;
+$$;
+grant execute on function public.zi_next_factura() to anon, authenticated;
+
 -- Galería custom de fotos (extra a los presets)
 create table if not exists public.zi_galeria (
   id uuid primary key default gen_random_uuid(),
