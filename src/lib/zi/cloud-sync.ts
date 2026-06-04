@@ -121,7 +121,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
       const { data, error } = await ziSupabase.from(`zi_${k}`).select("data");
       if (error) throw new Error(`${k}: ${error.message}`);
       const remote = (data || []).map((r: any) => r.data);
-      const arr = options.merge ? mergeById(readLS(k), remote) : remote;
+      const arr = options.merge ? mergeById(readLS<any>(k), remote) : remote;
       writeLS(k, arr);
       details.push(`✓ ${k}: ${arr.length}`);
     }
