@@ -120,7 +120,9 @@ export function useCloudBoot() {
   useEffect(() => {
     if (cloudBooted) return;
     cloudBooted = true;
-    const sync = () => import("./cloud-sync").then(({ pullAllFromCloud }) => pullAllFromCloud({ merge: true, silent: true })).then(() => emit()).catch(() => {});
+    const sync = () => import("./cloud-sync")
+      .then(async ({ pullAllFromCloud, pushAllToCloud }) => { await pullAllFromCloud({ merge: true, silent: true }); await pushAllToCloud(); })
+      .then(() => emit()).catch(() => {});
     sync();
     const i = window.setInterval(sync, 15000);
     const onFocus = () => sync();
