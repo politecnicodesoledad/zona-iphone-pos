@@ -123,7 +123,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
             id: uid(), nombre: p.nombre, categoria: p.categoria, costo: p.costo, precio: p.precio,
             gananciaPotencial: (p.precio - p.costo), fechaArchivado: Date.now(), original: p,
           });
-          psNew.splice(idx, 1);
         }
       }
     });
