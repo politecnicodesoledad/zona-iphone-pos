@@ -3,6 +3,7 @@ import type {
   Producto, Venta, Gasto, ClienteCRM, Proveedor, Empleado,
   ProductoVendido, ZIConfig,
 } from "./types";
+import { pushCollectionToCloud, pushConfigToCloud, pullAllFromCloud } from "./cloud-sync";
 
 const KEYS = {
   config: "zi_config",
@@ -78,6 +79,19 @@ function write<T>(key: string, value: T) {
   window.dispatchEvent(new StorageEvent("storage", { key }));
 }
 
+let cloudBooted = false;
+function cloudKey(key: string) { return key.startsWith("zi_") ? key.slice(3) : key === KEYS.facturaNum ? "facturaNum" : key; }
+function queueCloudSync(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  if (!cloudBooted && key !== KEYS.config) return;
+  const k = cloudKey(key);
+  window.setTimeout(() => {
+    if (k === "config") pushConfigToCloud(value as ZIConfig).catch(() => {});
+    else if (k === "facturaNum") pushCollectionToCloud("facturaNum", value).catch(() => {});
+    else pushCollectionToCloud(k, Array.isArray(value) ? value : []).catch(() => {});
+  }, 120);
+}
+
 // --- subscription system ---
 const listeners = new Set<() => void>();
 function emit() { listeners.forEach((l) => l()); }
@@ -95,9 +109,23 @@ function useKey<T>(key: string, fallback: T): [T, (v: T | ((p: T) => T)) => void
     const prev = read(key, fallback);
     const next = typeof v === "function" ? (v as (p: T) => T)(prev) : v;
     write(key, next);
+    queueCloudSync(key, next);
     emit();
   }, [key]);
   return [value, set];
+}
+
+export function useCloudBoot() {
+  useEffect(() => {
+    if (cloudBooted) return;
+    cloudBooted = true;
+    pullAllFromCloud({ merge: true, silent: true }).then(() => emit()).catch(() => {});
+    const sync = () => pullAllFromCloud({ merge: true, silent: true }).then(() => emit()).catch(() => {});
+    const i = window.setInterval(sync, 45000);
+    const onFocus = () => sync();
+    window.addEventListener("focus", onFocus);
+    return () => { window.clearInterval(i); window.removeEventListener("focus", onFocus); };
+  }, []);
 }
 
 // --- typed hooks ---
@@ -121,17 +149,17 @@ export const useFacturaNum = () => useKey<number>(KEYS.facturaNum, 1);
 export const Store = {
   config: () => ({ ...DEFAULT_CONFIG, ...read<ZIConfig>(KEYS.config, DEFAULT_CONFIG) }),
   productos: () => read<Producto[]>(KEYS.productos, []),
-  setProductos: (v: Producto[]) => { write(KEYS.productos, v); emit(); },
+  setProductos: (v: Producto[]) => { write(KEYS.productos, v); queueCloudSync(KEYS.productos, v); emit(); },
   vendidos: () => read<ProductoVendido[]>(KEYS.vendidos, []),
-  setVendidos: (v: ProductoVendido[]) => { write(KEYS.vendidos, v); emit(); },
+  setVendidos: (v: ProductoVendido[]) => { write(KEYS.vendidos, v); queueCloudSync(KEYS.vendidos, v); emit(); },
   ventas: () => read<Venta[]>(KEYS.ventas, []),
-  setVentas: (v: Venta[]) => { write(KEYS.ventas, v); emit(); },
+  setVentas: (v: Venta[]) => { write(KEYS.ventas, v); queueCloudSync(KEYS.ventas, v); emit(); },
   gastos: () => read<Gasto[]>(KEYS.gastos, []),
-  setGastos: (v: Gasto[]) => { write(KEYS.gastos, v); emit(); },
+  setGastos: (v: Gasto[]) => { write(KEYS.gastos, v); queueCloudSync(KEYS.gastos, v); emit(); },
   clientes: () => read<ClienteCRM[]>(KEYS.clientes, []),
-  setClientes: (v: ClienteCRM[]) => { write(KEYS.clientes, v); emit(); },
+  setClientes: (v: ClienteCRM[]) => { write(KEYS.clientes, v); queueCloudSync(KEYS.clientes, v); emit(); },
   facturaNum: () => read<number>(KEYS.facturaNum, 1),
-  setFacturaNum: (v: number) => { write(KEYS.facturaNum, v); emit(); },
+  setFacturaNum: (v: number) => { write(KEYS.facturaNum, v); queueCloudSync(KEYS.facturaNum, v); emit(); },
 };
 
 // Session
