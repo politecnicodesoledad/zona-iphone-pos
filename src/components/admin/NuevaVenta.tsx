@@ -8,7 +8,7 @@ import { Trash2, Search, Plus } from "lucide-react";
 
 interface Item extends VentaProducto { id: string; precioBase: number; }
 
-export function NuevaVenta() {
+export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [productos] = useProductos();
   const [, setVentas] = useVentas();
   const [, setGastos] = useGastos();
@@ -42,8 +42,14 @@ export function NuevaVenta() {
 
   const [obs, setObs] = useState("");
   const [ultimaVenta, setUltima] = useState<Venta | null>(null);
+  const [fechaFactura, setFechaFactura] = useState(() => new Date().toISOString().slice(0, 16));
+  const [pinFecha, setPinFecha] = useState("");
 
-  const matches = useMemo(() => search ? productos.filter(p => p.stock > 0 && p.nombre.toLowerCase().includes(search.toLowerCase())).slice(0, 6) : [], [productos, search]);
+  const disponibles = useMemo(() => productos.filter(p => p.stock > 0), [productos]);
+  const matches = useMemo(() => {
+    const base = search ? disponibles.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase())) : disponibles;
+    return base.slice(0, search ? 8 : 12);
+  }, [disponibles, search]);
   const total = items.reduce((s, i) => s + i.subtotal, 0);
   const descuentoTotal = items.reduce((s, i) => s + (i.descuento || 0), 0);
   const cValorCuota = cCuotas > 0 ? (total - cInicial) / cCuotas : 0;
@@ -78,18 +84,26 @@ export function NuevaVenta() {
 
   function finalizar() {
     if (items.length === 0) { alert("Agrega al menos un producto"); return; }
+    const requiereCliente = tipoPago === "credito" || tipoPago === "tradein";
+    if (requiereCliente && (!cNombre.trim() || !cTel.trim() || !cCedula.trim())) {
+      alert("Para crédito o celular como parte de pago debes registrar nombre, teléfono y cédula."); return;
+    }
+    if (retroMode && pinFecha !== "0011") { alert("PIN incorrecto para registrar venta con fecha manual"); return; }
+    const fechaVenta = retroMode ? new Date(fechaFactura).getTime() : Date.now();
+    if (!Number.isFinite(fechaVenta)) { alert("Fecha inválida"); return; }
     const factura = fmtFactura(num);
     const venta: Venta = {
-      id: uid(), factura, fecha: Date.now(), tipo: tipoPago, local, asesor,
+      id: uid(), factura, fecha: fechaVenta, registradaEn: Date.now(), fechaManual: retroMode, tipo: tipoPago, local, asesor,
       productos: items.map(({ id: _id, precioBase: _pb, ...rest }) => rest),
       total, descuentoTotal, observaciones: obs,
+      ...((cNombre || cTel || cCedula) && { cliente: { nombre: cNombre.trim(), cedula: cCedula.trim(), telefono: cTel.trim() } }),
       ...(tipoPago === "contado" && { metodoPago: metodo, recibido }),
       ...(tipoPago === "credito" && {
         cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel },
         creditoCuotas: cCuotas, creditoCuotaInicial: cInicial, creditoValorCuota: cValorCuota,
       }),
       ...(tipoPago === "tradein" && {
-        cliente: { nombre: cNombre },
+        cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel },
         tradeIn: { marca: tMarca, modelo: tModelo, imei: tImei, valor: tValor, restante: tRestante, metodoRestante: tMetodo },
       }),
     };
