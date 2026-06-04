@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { useVentas, useGastos, useConfig, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, fmtDateTime, rangeFor, type Periodo, maskCedula } from "@/lib/zi/format";
-import { generarFacturaPDF, exportarHistorialPDF } from "@/lib/zi/pdf";
+import { generarFacturaPDF, exportarHistorialPDF, facturaWhatsappText } from "@/lib/zi/pdf";
 import { exportarVentasExcel } from "@/lib/zi/excel";
 import { Card, Btn, Input, Select, Tabs, Field, Modal, Stat } from "./ui";
 import { Trash2, Printer, MessageCircle, Download } from "lucide-react";
 import type { Venta, Gasto } from "@/lib/zi/types";
+import { NuevaVenta } from "./NuevaVenta";
 
 export function Finanzas() {
   const [tab, setTab] = useState("historial");
@@ -13,10 +14,24 @@ export function Finanzas() {
     <div>
       <Tabs tabs={[
         { id: "historial", label: "📋 Historial" },
+        { id: "retro", label: "🗓 Venta con fecha" },
         { id: "canceladas", label: "🚫 Canceladas" },
       ]} active={tab} onChange={setTab} />
       {tab === "historial" && <Historial />}
+      {tab === "retro" && <RetroVenta />}
       {tab === "canceladas" && <Canceladas />}
+    </div>
+  );
+}
+
+function RetroVenta() {
+  return (
+    <div className="space-y-4">
+      <Card className="bg-amber-50 border-amber-200">
+        <h3 className="font-display text-2xl text-amber-900">Registrar venta atrasada</h3>
+        <p className="text-sm text-amber-800 mt-1">Usa esta opción solo para recuperar una factura de otro día. Requiere PIN 0011 y queda marcada en el historial.</p>
+      </Card>
+      <NuevaVenta retroMode />
     </div>
   );
 }
@@ -46,6 +61,10 @@ function Historial() {
     if (pin !== cfg.cancelPin) { setPinErr("PIN incorrecto"); return; }
     setVentas(prev => prev.map(v => v.id === pinModal!.id ? { ...v, cancelada: true, canceladaEn: Date.now(), razonCancelacion: "Cancelada desde historial" } : v));
     setPinModal(null); setPin(""); setPinErr(""); setDetail(null);
+  }
+  function sendWhatsapp(v: Venta) {
+    const phone = (v.cliente?.telefono || cfg.whatsapp).replace(/\D/g, "");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(facturaWhatsappText(v, cfg))}`, "_blank");
   }
 
   return (
@@ -90,23 +109,26 @@ function Historial() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
-                <tr><th className="text-left py-2">Factura</th><th className="text-left">Fecha</th><th className="text-left">Cliente</th><th className="text-right">Total</th><th>Pago</th><th>Asesor</th><th></th></tr>
+                <tr><th className="text-left py-2">Factura</th><th className="text-left">Fecha</th><th className="text-left">Cliente</th><th className="text-left">Teléfono</th><th className="text-right">Total</th><th className="text-right">Ganancia</th><th>Pago</th><th></th></tr>
               </thead>
               <tbody>
-                {list.map(v => (
-                  <tr key={v.id} className="border-b border-[var(--line)] hover:bg-[var(--mist)] cursor-pointer" onClick={() => setDetail(v)}>
-                    <td className="py-2 text-[var(--gold)] font-semibold">{v.factura}</td>
+                {list.map(v => {
+                  const costo = v.productos.reduce((s, p) => s + (p.costo || 0) * p.cantidad, 0);
+                  return <tr key={v.id} className="border-b border-[var(--line)] hover:bg-[var(--mist)] cursor-pointer" onClick={() => setDetail(v)}>
+                    <td className="py-2 text-[var(--gold)] font-semibold">{v.factura}{v.fechaManual && <span className="ml-1 text-[9px] text-amber-700">MANUAL</span>}</td>
                     <td className="text-xs text-gray-400">{fmtDate(v.fecha)}</td>
                     <td className="text-xs">{v.cliente?.nombre || "—"}</td>
+                    <td className="text-xs">{v.cliente?.telefono || "—"}</td>
                     <td className="text-right">{fmtCOP(v.total)}</td>
+                    <td className="text-right text-emerald-600">{fmtCOP(v.total - costo)}</td>
                     <td className="text-xs uppercase text-gray-400">{v.tipo}</td>
-                    <td className="text-xs">{v.asesor || "—"}</td>
                     <td className="text-right" onClick={e => e.stopPropagation()}>
                       <button title="Reimprimir" className="text-[var(--gold)] px-2" onClick={() => generarFacturaPDF(v, cfg)}><Printer className="w-4 h-4" /></button>
+                      <button title="Enviar por WhatsApp" className="text-emerald-600 px-2" onClick={() => sendWhatsapp(v)}><MessageCircle className="w-4 h-4" /></button>
                       <button title="Cancelar" className="text-red-600 px-2" onClick={() => setPinModal(v)}><Trash2 className="w-4 h-4" /></button>
                     </td>
-                  </tr>
-                ))}
+                  </tr>;
+                })}
               </tbody>
             </table>
           </div>
