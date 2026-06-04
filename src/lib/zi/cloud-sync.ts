@@ -51,6 +51,13 @@ export async function pushCollectionToCloud(key: string, value: unknown) {
   if (Array.isArray(value)) await upsertRows(key, value);
 }
 
+export async function nextFacturaNumber(fallback: number) {
+  if (!(await ziCloudReady())) return fallback;
+  const { data, error } = await ziSupabase.rpc("zi_next_factura");
+  if (error || typeof data !== "number") return fallback;
+  return data;
+}
+
 export async function pushAllToCloud(): Promise<SyncReport> {
   if (!(await ziCloudReady())) {
     return { ok: false, message: "El schema no está creado en Supabase. Pega SUPABASE_SETUP.sql en el SQL Editor primero." };
