@@ -173,7 +173,7 @@ function Historial() {
             <div className="flex gap-2 pt-3 border-t border-[var(--line)]">
               <Btn variant="danger" onClick={() => setPinModal(detail)}><Trash2 className="inline w-3 h-3" /> Cancelar</Btn>
               {detail.cliente?.telefono &&
-                <Btn variant="ok" onClick={() => window.open(`https://wa.me/${detail.cliente!.telefono}?text=${encodeURIComponent(`Hola ${detail.cliente!.nombre}, te confirmamos tu compra ${detail.factura} por ${fmtCOP(detail.total)}`)}`)}>
+                <Btn variant="ok" onClick={() => sendWhatsapp(detail)}>
                   <MessageCircle className="inline w-3 h-3" /> WhatsApp
                 </Btn>}
               <Btn variant="gold" onClick={() => generarFacturaPDF(detail, cfg)}><Printer className="inline w-3 h-3" /> Imprimir</Btn>
