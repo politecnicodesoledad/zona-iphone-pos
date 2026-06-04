@@ -151,7 +151,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     }
     setUltima(venta);
     // reset
-    setItems([]); setObs(""); setRecibido(0);
+    setItems([]); setObs(""); setRecibido(0); setPinFecha(""); setFechaFactura(new Date().toISOString().slice(0, 16));
     setCNombre(""); setCCedula(""); setCTel(""); setCInicial(0); setCCuotas(3);
     setTMarca(""); setTModelo(""); setTImei(""); setTValor(0);
     alert(`Venta ${factura} guardada ✓`);
