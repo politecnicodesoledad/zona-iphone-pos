@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useProductos, useOtros, useGastos, useVendidos, useConfig, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate } from "@/lib/zi/format";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field, Modal, Stat } from "./ui";
 import type { Producto, Categoria, EstadoProducto, CostoOrigen, ColorOpt } from "@/lib/zi/types";
 import { Trash2, Plus, RotateCcw, Edit, ImagePlus, Link as LinkIcon, Upload } from "lucide-react";
 import { GALERIA_IPHONE } from "@/lib/zi/galeria-iphone";
+import { addCustomGallery, pullCustomGallery, readCustomGallery, removeCustomGallery } from "@/lib/zi/gallery-store";
 
 export function Inventario() {
   const [tab, setTab] = useState("productos");
