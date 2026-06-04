@@ -79,6 +79,7 @@ function write<T>(key: string, value: T) {
 }
 
 let cloudBooted = false;
+let cloudRuntimeStarted = false;
 function cloudKey(key: string) { return key.startsWith("zi_") ? key.slice(3) : key === KEYS.facturaNum ? "facturaNum" : key; }
 function queueCloudSync(key: string, value: unknown) {
   if (typeof window === "undefined") return;
@@ -118,7 +119,8 @@ function useKey<T>(key: string, fallback: T): [T, (v: T | ((p: T) => T)) => void
 
 export function useCloudBoot() {
   useEffect(() => {
-    if (cloudBooted) return;
+    if (cloudRuntimeStarted) return;
+    cloudRuntimeStarted = true;
     cloudBooted = true;
     const sync = () => import("./cloud-sync")
       .then(async ({ pullAllFromCloud, pushAllToCloud }) => { await pullAllFromCloud({ merge: true, silent: true }); await pushAllToCloud(); })
@@ -127,7 +129,7 @@ export function useCloudBoot() {
     const i = window.setInterval(sync, 15000);
     const onFocus = () => sync();
     window.addEventListener("focus", onFocus);
-    return () => { window.clearInterval(i); window.removeEventListener("focus", onFocus); };
+    return () => { cloudRuntimeStarted = false; window.clearInterval(i); window.removeEventListener("focus", onFocus); };
   }, []);
 }
 
