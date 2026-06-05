@@ -27,7 +27,7 @@ export function Ganancias() {
     const operativos = gs.reduce((s, g) => s + g.monto, 0);
     const inversionActiva = productos.filter(p => local === "todos" || String(p.local) === local).reduce((s, p) => s + p.costo * Math.max(0, p.stock), 0);
     const inversionVendida = vendidos.filter(v => (v.fechaVenta || v.fechaArchivado) >= start && (v.fechaVenta || v.fechaArchivado) <= end).reduce((s, v) => s + v.costo * (v.cantidad || 1), 0);
-    const inversion = inversionActiva + inversionVendida + ci.reduce((s, g) => s + g.monto, 0);
+    const inversion = inversionActiva + inversionVendida;
     const salarios = empleados.reduce((s, e) =>
       s + e.historialPagos.filter(p => p.fecha >= start && p.fecha <= end).reduce((a, p) => a + p.monto, 0), 0);
     const gananciaBruta = ingresos - costoVendido;
