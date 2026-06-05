@@ -3,9 +3,10 @@ import { useProductos, useOtros, useGastos, useVendidos, useConfig, uid } from "
 import { fmtCOP, fmtDate } from "@/lib/zi/format";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field, Modal, Stat } from "./ui";
 import type { Producto, Categoria, EstadoProducto, CostoOrigen, ColorOpt } from "@/lib/zi/types";
-import { Trash2, Plus, RotateCcw, Edit, ImagePlus, Link as LinkIcon, Upload } from "lucide-react";
+import { Trash2, Plus, RotateCcw, Edit, ImagePlus, Link as LinkIcon, Upload, Download } from "lucide-react";
 import { GALERIA_IPHONE } from "@/lib/zi/galeria-iphone";
 import { addCustomGallery, pullCustomGallery, readCustomGallery, removeCustomGallery } from "@/lib/zi/gallery-store";
+import { exportarProductosExcel, exportarVendidosExcel } from "@/lib/zi/excel";
 
 export function Inventario() {
   const [tab, setTab] = useState("productos");
@@ -39,6 +40,7 @@ function ProductosTab({ modo }: { modo: "productos" | "accesorios" }) {
   const [, setGastos] = useGastos();
   const data = modo === "productos" ? productos : otros;
   const setData = modo === "productos" ? setProductos : setOtros;
+  const visibleData = data.filter(p => p.stock > 0);
 
   const [editing, setEditing] = useState<Producto | null>(null);
   const [open, setOpen] = useState(false);
@@ -76,16 +78,16 @@ function ProductosTab({ modo }: { modo: "productos" | "accesorios" }) {
       <Card>
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-display text-xl text-[var(--gold)]">{modo === "productos" ? "Productos" : "Accesorios"}</h3>
-          <Btn onClick={() => { setEditing(emptyP()); setOpen(true); }}><Plus className="inline w-3 h-3" /> Agregar</Btn>
+          <div className="flex gap-2"><Btn variant="ghost" onClick={() => exportarProductosExcel(data, `${modo}-inventario.xls`)} disabled={data.length === 0}><Download className="inline w-3 h-3" /> Excel</Btn><Btn onClick={() => { setEditing(emptyP()); setOpen(true); }}><Plus className="inline w-3 h-3" /> Agregar</Btn></div>
         </div>
-        {data.length === 0 ? <p className="text-sm text-gray-500">Sin productos.</p> : (
+        {visibleData.length === 0 ? <p className="text-sm text-gray-500">Sin productos.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-[10px] uppercase text-gray-500 border-b border-[var(--line)]">
                 <tr><th className="text-left py-2">Producto</th><th>Cat</th><th>Estado</th><th className="text-right">Stock</th><th className="text-right">Costo</th><th className="text-right">Precio</th><th className="text-right">Ganancia</th><th></th></tr>
               </thead>
               <tbody>
-                {data.map(p => (
+                {visibleData.map(p => (
                   <tr key={p.id} className="border-b border-[var(--line)]">
                     <td className="py-2"><div className="flex items-center gap-2">{p.imagen ? <img src={p.imagen} className="w-8 h-8 object-contain bg-[var(--mist)] rounded" /> : <span>📱</span>}<span>{p.nombre}</span></div></td>
                     <td className="text-xs text-gray-400 uppercase">{p.categoria}</td>
@@ -297,6 +299,7 @@ function AnalisisTab() {
 function VendidosTab() {
   const [vendidos, setVendidos] = useVendidos();
   const [, setProductos] = useProductos();
+  const [edit, setEdit] = useState<typeof vendidos[number] | null>(null);
 
   const total = vendidos.length;
   const ingresos = vendidos.reduce((s, v) => s + v.precio, 0);
@@ -323,6 +326,7 @@ function VendidosTab() {
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-display text-xl text-[var(--gold)]">Dispositivos vendidos</h3>
           <div className="flex gap-2">
+            {vendidos.length > 0 && <Btn variant="ghost" onClick={() => exportarVendidosExcel(vendidos)}><Download className="inline w-3 h-3" /> Excel</Btn>}
             {vendidos.length > 0 && <Btn variant="ghost" onClick={restaurarTodos}><RotateCcw className="inline w-3 h-3" /> Restaurar todos</Btn>}
             {vendidos.length > 0 && <Btn variant="danger" onClick={() => { if (confirm("¿Vaciar vendidos?")) setVendidos([]); }}>🗑 Vaciar</Btn>}
           </div>
@@ -332,12 +336,15 @@ function VendidosTab() {
             <thead className="text-[10px] uppercase text-gray-500 border-b border-[var(--line)]"><tr><th className="text-left py-2">Nombre</th><th>Cat.</th><th className="text-right">Costo</th><th className="text-right">Precio</th><th className="text-right">Ganancia</th><th>Archivo</th><th></th></tr></thead>
             <tbody>
               {vendidos.map(v => (
-                <tr key={v.id} className="border-b border-[var(--line)]"><td className="py-2">{v.nombre}</td><td className="text-xs uppercase text-gray-400">{v.categoria}</td><td className="text-right text-gray-400">{fmtCOP(v.costo)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(v.precio)}</td><td className="text-right text-emerald-600">{fmtCOP(v.gananciaPotencial)}</td><td className="text-xs text-gray-400">{fmtDate(v.fechaArchivado)}</td><td className="text-right"><button onClick={() => restaurar(v.id)} className="text-blue-600"><RotateCcw className="w-4 h-4" /></button></td></tr>
+                <tr key={v.id} className="border-b border-[var(--line)]"><td className="py-2">{v.nombre}</td><td className="text-xs uppercase text-gray-400">{v.categoria}</td><td className="text-right text-gray-400">{fmtCOP(v.costo)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(v.precio)}</td><td className="text-right text-emerald-600">{fmtCOP(v.gananciaPotencial)}</td><td className="text-xs text-gray-400">{fmtDate(v.fechaVenta || v.fechaArchivado)}</td><td className="text-right"><button onClick={() => setEdit(v)} className="text-[var(--gold)] px-2"><Edit className="w-4 h-4" /></button><button onClick={() => restaurar(v.id)} className="text-blue-600 px-2"><RotateCcw className="w-4 h-4" /></button></td></tr>
               ))}
             </tbody>
           </table>
         )}
       </Card>
+      <Modal open={!!edit} onClose={() => setEdit(null)} title="Editar producto vendido" size="md">
+        {edit && <div className="space-y-3"><Field label="Nombre"><Input value={edit.nombre} onChange={e => setEdit({ ...edit, nombre: e.target.value })} /></Field><Field label="Cantidad"><Input type="number" value={edit.cantidad || 1} onChange={e => setEdit({ ...edit, cantidad: Math.max(1, +e.target.value || 1) })} /></Field><Field label="Detalle extra"><Input value={edit.detalleExtra || ""} onChange={e => setEdit({ ...edit, detalleExtra: e.target.value })} placeholder="Color, IMEI, capacidad, estado..." /></Field><Field label="Observaciones"><Textarea rows={3} value={edit.observaciones || ""} onChange={e => setEdit({ ...edit, observaciones: e.target.value })} /></Field><Btn className="w-full" onClick={() => { setVendidos(prev => prev.map(v => v.id === edit.id ? edit : v)); setEdit(null); }}>💾 Guardar vendido</Btn></div>}
+      </Modal>
     </div>
   );
 }

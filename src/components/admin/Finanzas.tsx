@@ -2,8 +2,8 @@ import { useState, useMemo } from "react";
 import { useVentas, useGastos, useConfig, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, fmtDateTime, rangeFor, type Periodo, maskCedula } from "@/lib/zi/format";
 import { generarFacturaPDF, exportarHistorialPDF, facturaWhatsappText } from "@/lib/zi/pdf";
-import { exportarVentasExcel } from "@/lib/zi/excel";
-import { Card, Btn, Input, Select, Tabs, Field, Modal, Stat } from "./ui";
+import { exportarVentasExcel, importarVentasDesdeExcel } from "@/lib/zi/excel";
+import { Card, Btn, Input, Select, Tabs, Field, Modal, Stat, DateTriple } from "./ui";
 import { Trash2, Printer, MessageCircle, Download } from "lucide-react";
 import type { Venta, Gasto } from "@/lib/zi/types";
 import { NuevaVenta } from "./NuevaVenta";
@@ -66,6 +66,14 @@ function Historial() {
     const phone = (v.cliente?.telefono || cfg.whatsapp).replace(/\D/g, "");
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(facturaWhatsappText(v, cfg))}`, "_blank");
   }
+  async function importarExcel(file: File) {
+    const imported = await importarVentasDesdeExcel(file);
+    setVentas(prev => {
+      const ids = new Set(prev.map(v => v.id));
+      return [...prev, ...imported.filter(v => !ids.has(v.id))];
+    });
+    alert(`Importadas ${imported.length} ventas del Excel. DIOVANNYS fue omitida si estaba en el archivo.`);
+  }
 
   return (
     <div className="space-y-4">
@@ -81,8 +89,8 @@ function Historial() {
           {(["hoy","mes","todos"] as Periodo[]).map(p =>
             <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1.5 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>{p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : "Todos"}</button>
           )}
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1.5 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1.5 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
+          <div className="min-w-[260px]"><DateTriple value={from} onChange={v => { setFrom(v); setPeriodo("custom"); }} /></div>
+          <div className="min-w-[260px]"><DateTriple value={to} onChange={v => { setTo(v); setPeriodo("custom"); }} /></div>
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por # o cliente" className="w-auto flex-1 min-w-[180px]" />
           <Btn
             variant="gold"
@@ -101,6 +109,10 @@ function Historial() {
           >
             <Download className="inline w-3.5 h-3.5 mr-1" /> Excel
           </Btn>
+          <label className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-[0.08em] border border-[var(--line)] text-gray-700 bg-white hover:border-[var(--gold)] cursor-pointer">
+            Importar Excel
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => e.target.files?.[0] && importarExcel(e.target.files[0])} />
+          </label>
         </div>
       </Card>
 

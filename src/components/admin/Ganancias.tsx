@@ -1,13 +1,15 @@
 import { useState, useMemo } from "react";
-import { useVentas, useGastos, useEmpleados } from "@/lib/zi/store";
+import { useVentas, useGastos, useEmpleados, useProductos, useVendidos } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, rangeFor, type Periodo } from "@/lib/zi/format";
-import { Card, Stat, Btn } from "./ui";
+import { Card, Stat, Btn, DateTriple } from "./ui";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export function Ganancias() {
   const [ventas] = useVentas();
   const [gastos] = useGastos();
   const [empleados] = useEmpleados();
+  const [productos] = useProductos();
+  const [vendidos] = useVendidos();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -23,13 +25,15 @@ export function Ganancias() {
     const ingresos = vs.reduce((s, v) => s + v.total, 0);
     const costoVendido = vs.reduce((s, v) => s + v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0), 0);
     const operativos = gs.reduce((s, g) => s + g.monto, 0);
-    const inversion = ci.reduce((s, g) => s + g.monto, 0);
+    const inversionActiva = productos.filter(p => local === "todos" || String(p.local) === local).reduce((s, p) => s + p.costo * Math.max(0, p.stock), 0);
+    const inversionVendida = vendidos.filter(v => (v.fechaVenta || v.fechaArchivado) >= start && (v.fechaVenta || v.fechaArchivado) <= end).reduce((s, v) => s + v.costo * (v.cantidad || 1), 0);
+    const inversion = inversionActiva + inversionVendida;
     const salarios = empleados.reduce((s, e) =>
       s + e.historialPagos.filter(p => p.fecha >= start && p.fecha <= end).reduce((a, p) => a + p.monto, 0), 0);
     const gananciaBruta = ingresos - costoVendido;
     const neta = gananciaBruta - operativos - salarios;
     return { vs, ingresos, costoVendido, operativos, inversion, salarios, gananciaBruta, neta };
-  }, [ventas, gastos, empleados, start, end, local]);
+  }, [ventas, gastos, empleados, productos, vendidos, start, end, local]);
 
   // por asesor
   const porAsesor = useMemo(() => {
@@ -71,9 +75,9 @@ export function Ganancias() {
           ))}
           {periodo === "custom" && (
             <div className="flex gap-2 items-center">
-              <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
+              <div className="min-w-[250px]"><DateTriple value={from} onChange={setFrom} /></div>
               <span className="text-gray-500 text-xs">→</span>
-              <input type="date" value={to} onChange={e => setTo(e.target.value)} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
+              <div className="min-w-[250px]"><DateTriple value={to} onChange={setTo} /></div>
             </div>
           )}
           <select value={local} onChange={e => setLocal(e.target.value as never)} className="ml-auto px-3 py-1.5 bg-white border border-[var(--line)] rounded-full text-xs text-[var(--ink)]">
@@ -85,7 +89,7 @@ export function Ganancias() {
       </Card>
 
       <div className="grid md:grid-cols-3 gap-4">
-        <Stat label="💰 Inversión en productos" value={fmtCOP(data.inversion)} hint="Capital invertido este período" />
+        <Stat label="💰 Inversión en productos" value={fmtCOP(data.inversion)} hint="Inventario activo + costo vendido del período" />
         <Stat label="📈 Ingresos totales" value={fmtCOP(data.ingresos)} hint={`${data.vs.length} ventas`} />
         <Stat label="🟢 Ganancia neta" value={fmtCOP(data.neta)} color={data.neta < 0 ? "#ef4444" : "var(--gold)"} />
       </div>

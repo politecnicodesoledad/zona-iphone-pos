@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useProductos, useVentas, useGastos, useClientes, useFacturaNum, useConfig, useVendidos, Store, uid, fmtFactura } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
 import { facturaWhatsappText, generarFacturaPDF } from "@/lib/zi/pdf";
-import { Card, Btn, Input, Select, Textarea, Tabs, Field } from "./ui";
+import { Card, Btn, Input, Select, Textarea, Tabs, Field, DateTriple } from "./ui";
 import type { VentaProducto, Venta, Producto } from "@/lib/zi/types";
 import { Trash2, Search, Plus, MessageCircle } from "lucide-react";
 
@@ -41,6 +41,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [tMetodo, setTMetodo] = useState<"efectivo" | "nequi" | "transferencia" | "datafono">("efectivo");
 
   const [obs, setObs] = useState("");
+  const [garantia, setGarantia] = useState("");
   const [ultimaVenta, setUltima] = useState<Venta | null>(null);
   const [fechaFactura, setFechaFactura] = useState(() => new Date().toISOString().slice(0, 16));
   const [pinFecha, setPinFecha] = useState("");
@@ -97,7 +98,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     const venta: Venta = {
       id: uid(), factura, fecha: fechaVenta, registradaEn: Date.now(), fechaManual: retroMode, tipo: tipoPago, local, asesor,
       productos: items.map(({ id: _id, precioBase: _pb, ...rest }) => rest),
-      total, descuentoTotal, observaciones: obs,
+      total, descuentoTotal, observaciones: obs, garantia: garantia.trim() || cfg.facturaGarantia,
       ...((cNombre || cTel || cCedula) && { cliente: { nombre: cNombre.trim(), cedula: cCedula.trim(), telefono: cTel.trim() } }),
       ...(tipoPago === "contado" && { metodoPago: metodo, recibido }),
       ...(tipoPago === "credito" && {
@@ -112,20 +113,29 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     // descontar stock + archivar si llega a 0
     const ps = Store.productos();
     const vendidosArr = Store.vendidos();
-    const psNew = [...ps];
+    let psNew = [...ps];
     items.forEach(it => {
       const idx = psNew.findIndex(p => p.id === it.productoId);
       if (idx >= 0) {
-        psNew[idx] = { ...psNew[idx], stock: Math.max(0, psNew[idx].stock - it.cantidad) };
-        if (psNew[idx].stock <= 0) {
-          const p = psNew[idx];
+        const p = { ...psNew[idx], stock: Math.max(0, psNew[idx].stock - it.cantidad) };
+        psNew[idx] = p;
+        if (p.stock <= 0) {
           vendidosArr.push({
-            id: uid(), nombre: p.nombre, categoria: p.categoria, costo: p.costo, precio: p.precio,
-            gananciaPotencial: (p.precio - p.costo), fechaArchivado: Date.now(), original: p,
+            id: uid(), nombre: p.nombre, categoria: p.categoria, cantidad: it.cantidad, costo: it.costo, precio: it.precioUnitario,
+            gananciaPotencial: (it.precioUnitario - it.costo) * it.cantidad, fechaArchivado: Date.now(), fechaVenta,
+            ventaId: venta.id, cliente: venta.cliente?.nombre, detalleExtra: it.color, observaciones: obs, original: p,
           });
         }
+      } else if (it.esRapido) {
+        vendidosArr.push({
+          id: uid(), nombre: it.nombre, categoria: "otro", cantidad: it.cantidad, costo: it.costo, precio: it.precioUnitario,
+          gananciaPotencial: (it.precioUnitario - it.costo) * it.cantidad, fechaArchivado: Date.now(), fechaVenta,
+          ventaId: venta.id, cliente: venta.cliente?.nombre, observaciones: obs,
+          original: { id: it.productoId, nombre: it.nombre, categoria: "otro", descripcion: "Venta rápida", estado: "personalizado", colores: [], imagen: "", precio: it.precioUnitario, costo: it.costo, stock: 1, local, costoOrigen: "capital_aparte", creadoEn: Date.now() },
+        });
       }
     });
+    psNew = psNew.filter(p => p.stock > 0);
     Store.setProductos(psNew);
     Store.setVendidos(vendidosArr);
 
@@ -152,7 +162,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     }
     setUltima(venta);
     // reset
-    setItems([]); setObs(""); setRecibido(0); setPinFecha(""); setFechaFactura(new Date().toISOString().slice(0, 16));
+    setItems([]); setObs(""); setGarantia(""); setRecibido(0); setPinFecha(""); setFechaFactura(new Date().toISOString().slice(0, 16));
     setCNombre(""); setCCedula(""); setCTel(""); setCInicial(0); setCCuotas(3);
     setTMarca(""); setTModelo(""); setTImei(""); setTValor(0);
     alert(`Venta ${factura} guardada ✓`);
@@ -210,7 +220,8 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
           <Card className="border-amber-200 bg-amber-50">
             <h3 className="font-display text-xl text-amber-900 mb-3">Venta con fecha manual</h3>
             <div className="grid md:grid-cols-2 gap-3">
-              <Field label="Fecha y hora real de la factura"><Input type="datetime-local" value={fechaFactura} onChange={e => setFechaFactura(e.target.value)} /></Field>
+              <Field label="Fecha real (mes / día / año)"><DateTriple value={fechaFactura.slice(0, 10)} onChange={v => setFechaFactura(`${v}${fechaFactura.slice(10) || "T12:00"}`)} /></Field>
+              <Field label="Hora"><Input type="time" value={(fechaFactura.split("T")[1] || "12:00").slice(0, 5)} onChange={e => setFechaFactura(`${fechaFactura.slice(0, 10)}T${e.target.value}`)} /></Field>
               <Field label="PIN requerido"><Input type="password" maxLength={4} value={pinFecha} onChange={e => setPinFecha(e.target.value.replace(/\D/g,""))} placeholder="0011" /></Field>
             </div>
           </Card>
@@ -302,7 +313,8 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
         </Card>
 
         <Card>
-          <Field label="Observaciones / Garantía"><Textarea rows={3} value={obs} onChange={e => setObs(e.target.value)} /></Field>
+          <Field label="Observaciones"><Textarea rows={2} value={obs} onChange={e => setObs(e.target.value)} placeholder="Notas internas, IMEI, detalles del pago..." /></Field>
+          <Field label="Garantía de esta venta"><Textarea rows={2} value={garantia} onChange={e => setGarantia(e.target.value)} placeholder={cfg.facturaGarantia} /></Field>
           <Field label="Local">
             <Select value={local} onChange={e => setLocal(+e.target.value as 1 | 2)}>
               {cfg.local1activo && <option value={1}>{cfg.local1nombre}</option>}

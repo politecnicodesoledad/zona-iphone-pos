@@ -280,6 +280,11 @@ function Empleados() {
     setEmp(prev => prev.map(x => x.id === e.id ? { ...x, historialPagos: [...x.historialPagos, { fecha: Date.now(), monto, descripcion: desc }] } : x));
     setPago(null);
   }
+  function borrarPago(e: Empleado, idx: number) {
+    if (!confirm("¿Eliminar este pago del empleado?")) return;
+    setEmp(prev => prev.map(x => x.id === e.id ? { ...x, historialPagos: x.historialPagos.filter((_, i) => i !== idx) } : x));
+    setPago(cur => cur ? { e: { ...cur.e, historialPagos: cur.e.historialPagos.filter((_, i) => i !== idx) } } : cur);
+  }
 
   return (
     <div className="space-y-4">
@@ -322,13 +327,13 @@ function Empleados() {
       </Modal>
 
       <Modal open={!!pago} onClose={() => setPago(null)} title={pago ? `Pago: ${pago.e.nombre}` : ""}>
-        {pago && <PagoForm e={pago.e} onSave={registrarPago} />}
+        {pago && <PagoForm e={pago.e} onSave={registrarPago} onDelete={borrarPago} />}
       </Modal>
     </div>
   );
 }
 
-function PagoForm({ e, onSave }: { e: Empleado; onSave: (e: Empleado, monto: number, desc: string) => void }) {
+function PagoForm({ e, onSave, onDelete }: { e: Empleado; onSave: (e: Empleado, monto: number, desc: string) => void; onDelete: (e: Empleado, idx: number) => void }) {
   const [monto, setMonto] = useState(e.monto);
   const [desc, setDesc] = useState("Pago quincenal");
   return (
@@ -340,7 +345,7 @@ function PagoForm({ e, onSave }: { e: Empleado; onSave: (e: Empleado, monto: num
         <div className="mt-3">
           <div className="text-xs uppercase text-gray-500 mb-1">Historial</div>
           <ul className="text-xs space-y-1 max-h-40 overflow-auto">
-            {e.historialPagos.slice().reverse().slice(0, 10).map((p, i) => <li key={i} className="flex justify-between"><span>{fmtDate(p.fecha)} {p.descripcion}</span><span className="text-[var(--gold)]">{fmtCOP(p.monto)}</span></li>)}
+            {e.historialPagos.map((p, idx) => ({ p, idx })).reverse().slice(0, 10).map(({ p, idx }) => <li key={idx} className="flex items-center justify-between gap-2"><span>{fmtDate(p.fecha)} {p.descripcion}</span><span className="ml-auto text-[var(--gold)]">{fmtCOP(p.monto)}</span><button onClick={() => onDelete(e, idx)} className="text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></li>)}
           </ul>
         </div>
       )}

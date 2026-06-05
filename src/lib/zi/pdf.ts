@@ -71,7 +71,7 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
     doc.setFont("courier", bold ? "bold" : "normal");
     doc.setTextColor(0, 0, 0);
     doc.text(l, 4, y); doc.text(r, w - 4, y, { align: "right" });
-    y += size * 0.55;
+    y += size * 0.62;
   };
 
   center((cfg.facturaSubtitulo || "CELULARES & ACCESORIOS").toUpperCase(), 6, false, [0, 0, 0]);
@@ -108,8 +108,8 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   venta.productos.forEach(p => {
     const lines = doc.splitTextToSize(p.nombre.toUpperCase(), 29);
     doc.setFont("courier", "bold"); doc.setFontSize(6.6); doc.setTextColor(0, 0, 0);
-    doc.text(lines, 4, y); doc.text(String(p.cantidad), 36, y, { align: "center" }); doc.text(fmtCOP(p.precioUnitario), 60, y, { align: "right" }); doc.text(fmtCOP(p.subtotal), w - 4, y, { align: "right" }); y += Math.max(4, lines.length * 3.2);
-    if (p.descuento) { doc.setFont("courier", "normal"); doc.setTextColor(90); doc.text("DESC - " + fmtCOP(p.descuento), 4, y); doc.text("-" + fmtCOP(p.descuento), w - 4, y, { align: "right" }); y += 3; }
+    doc.text(lines, 4, y); doc.text(String(p.cantidad), 36, y, { align: "center" }); doc.text(fmtCOP(p.precioUnitario), 60, y, { align: "right" }); doc.text(fmtCOP(p.subtotal), w - 4, y, { align: "right" }); y += Math.max(5, lines.length * 3.7);
+    if (p.descuento) { doc.setFont("courier", "normal"); doc.setTextColor(90); doc.text("DESC - " + fmtCOP(p.descuento), 4, y); doc.text("-" + fmtCOP(p.descuento), w - 4, y, { align: "right" }); y += 3.5; }
   });
   dash();
   row("DSCTO.", venta.descuentoTotal ? "- " + fmtCOP(venta.descuentoTotal) : fmtCOP(0), 7);
@@ -144,8 +144,8 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   doc.setFontSize(6.8); doc.setFont("courier", "bold");
   doc.setTextColor(0, 0, 0); doc.text("GARANTIA", 4, y); doc.text("6 MESES", w - 4, y, { align: "right" }); y += 4;
   doc.setFont("courier", "normal"); doc.setTextColor(0, 0, 0);
-  const garantia = doc.splitTextToSize(cfg.facturaGarantia, w - 8);
-  doc.text(garantia, 4, y); y += garantia.length * 3;
+  const garantia = doc.splitTextToSize(venta.garantia || cfg.facturaGarantia, w - 8);
+  doc.text(garantia, 4, y); y += garantia.length * 3.5;
 
   y += 2; dash();
   if (venta.asesor) center(venta.asesor, 6);

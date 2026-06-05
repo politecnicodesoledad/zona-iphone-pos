@@ -66,6 +66,7 @@ export interface Venta {
   creditoValorCuota?: number;
   tradeIn?: { marca: string; modelo: string; imei?: string; valor: number; restante: number; metodoRestante: string };
   observaciones?: string;
+  garantia?: string;
   cancelada?: boolean;
   canceladaEn?: number;
   razonCancelacion?: string;
@@ -133,10 +134,16 @@ export interface ProductoVendido {
   id: string;
   nombre: string;
   categoria: Categoria;
+  cantidad?: number;
   costo: number;
   precio: number;
   gananciaPotencial: number;
   fechaArchivado: number;
+  fechaVenta?: number;
+  ventaId?: string;
+  cliente?: string;
+  detalleExtra?: string;
+  observaciones?: string;
   original: Producto;
 }
 

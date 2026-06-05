@@ -27,14 +27,26 @@ function writeLS(key: string, v: unknown) {
 
 export interface SyncReport { ok: boolean; message: string; details?: string[] }
 
-function upsertRows(key: string, items: any[]) {
+const DELETE_MISSING_ON_PUSH = new Set(["productos", "otros"]);
+
+async function deleteMissingRows(key: string, ids: string[]) {
+  if (!DELETE_MISSING_ON_PUSH.has(key)) return;
+  const { data } = await ziSupabase.from(`zi_${key}`).select("id");
+  const keep = new Set(ids);
+  const missing = (data || []).map((r: any) => r.id).filter((id: string) => !keep.has(id));
+  if (missing.length) await Promise.all(missing.map((id: string) => ziSupabase.from(`zi_${key}`).delete().eq("id", id)));
+}
+
+async function upsertRows(key: string, items: any[]) {
   const rows = items.filter((it) => it?.id).map((it) => ({
     id: it.id,
     data: it,
     ...(key === "ventas" ? { fecha: new Date((it as Venta).fecha).toISOString() } : {}),
     updated_at: new Date().toISOString(),
   }));
-  return rows.length ? ziSupabase.from(`zi_${key}`).upsert(rows) : Promise.resolve({ error: null } as any);
+  const result = rows.length ? await ziSupabase.from(`zi_${key}`).upsert(rows) : ({ error: null } as any);
+  if (!result.error) await deleteMissingRows(key, rows.map((r) => r.id));
+  return result;
 }
 
 export async function pushConfigToCloud(cfg: ZIConfig) {
