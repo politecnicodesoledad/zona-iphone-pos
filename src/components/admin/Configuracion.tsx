@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConfig, useProductos } from "@/lib/zi/store";
 import { generarFacturaPDF } from "@/lib/zi/pdf";
 import { pushAllToCloud, pullAllFromCloud, type SyncReport } from "@/lib/zi/cloud-sync";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field } from "./ui";
 import type { Venta, EventType } from "@/lib/zi/types";
-import { Cloud, CloudUpload, CloudDownload, MapPin } from "lucide-react";
+import { Cloud, CloudUpload, CloudDownload, MapPin, Trash2, Upload } from "lucide-react";
+import { addCustomGallery, pullCustomGallery, readCustomGallery, removeCustomGallery, type CustomGaleriaItem } from "@/lib/zi/gallery-store";
 
 export function Configuracion() {
   const [tab, setTab] = useState("ajustes");
@@ -14,12 +15,14 @@ export function Configuracion() {
         { id: "ajustes", label: "⚙️ Ajustes" },
         { id: "locales", label: "📍 Locales" },
         { id: "nube", label: "☁️ Nube" },
+        { id: "galeria", label: "🖼 Galería" },
         { id: "eventos", label: "🎉 Eventos" },
         { id: "video", label: "🎬 Video" },
       ]} active={tab} onChange={setTab} />
       {tab === "ajustes" && <Ajustes />}
       {tab === "locales" && <Locales />}
       {tab === "nube" && <Nube />}
+      {tab === "galeria" && <Galeria />}
       {tab === "eventos" && <Eventos />}
       {tab === "video" && <Video />}
     </div>
@@ -171,6 +174,43 @@ function Nube() {
           )}
         </Card>
       )}
+    </div>
+  );
+}
+
+function Galeria() {
+  const [items, setItems] = useState<CustomGaleriaItem[]>(readCustomGallery());
+  const [form, setForm] = useState({ modelo: "", color: "", url: "" });
+  useEffect(() => { pullCustomGallery().then(setItems); }, []);
+  function upload(f: File) {
+    const reader = new FileReader();
+    reader.onload = () => setForm(x => ({ ...x, url: reader.result as string }));
+    reader.readAsDataURL(f);
+  }
+  async function add() {
+    if (!form.modelo.trim() || !form.url.trim()) return alert("Escribe modelo y agrega una imagen/link");
+    await addCustomGallery({ modelo: form.modelo.trim(), color: form.color.trim(), url: form.url.trim() });
+    setItems(readCustomGallery()); setForm({ modelo: "", color: "", url: "" });
+  }
+  async function del(id: string) {
+    if (!confirm("¿Eliminar imagen de la galería?")) return;
+    await removeCustomGallery(id); setItems(readCustomGallery());
+  }
+  return (
+    <div className="space-y-4">
+      <Card>
+        <h3 className="font-display text-xl text-[var(--gold-dark)] mb-3">Galería de productos</h3>
+        <div className="grid md:grid-cols-[1fr_1fr_2fr_auto_auto] gap-3 items-end">
+          <Field label="Modelo"><Input value={form.modelo} onChange={e => setForm({ ...form, modelo: e.target.value })} placeholder="iPhone 15 Pro" /></Field>
+          <Field label="Color"><Input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="Titanio" /></Field>
+          <Field label="Link de imagen"><Input value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://..." /></Field>
+          <label className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-[0.08em] border border-[var(--line)] bg-white cursor-pointer h-10 flex items-center gap-1"><Upload className="w-3 h-3" /> Archivo<input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && upload(e.target.files[0])} /></label>
+          <Btn onClick={add} className="h-10">Agregar</Btn>
+        </div>
+      </Card>
+      <Card>
+        {items.length === 0 ? <p className="text-sm text-gray-500">No hay imágenes personalizadas.</p> : <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">{items.map(it => <div key={it.id} className="border border-[var(--line)] rounded-xl p-2 bg-white"><div className="aspect-square bg-[var(--mist)] rounded-lg flex items-center justify-center overflow-hidden"><img src={it.url} alt={`${it.modelo} ${it.color}`} className="max-h-full object-contain" /></div><div className="mt-2 text-xs font-bold truncate">{it.modelo}</div><div className="text-[10px] text-gray-500 truncate">{it.color}</div><button onClick={() => del(it.id)} className="mt-2 text-red-600 text-xs inline-flex items-center gap-1"><Trash2 className="w-3 h-3" /> Eliminar</button></div>)}</div>}
+      </Card>
     </div>
   );
 }

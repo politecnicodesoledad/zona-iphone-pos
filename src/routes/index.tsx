@@ -442,9 +442,9 @@ function ProductCard({ p, onQuote, promoId, promoPrice }: { p: Producto; onQuote
   const displayPrice = isPromo ? promoPrice : p.precio;
   return (
     <div className="group bg-white border border-[var(--line)] rounded-2xl overflow-hidden hover:border-[var(--gold)] hover:shadow-soft hover:-translate-y-1 transition-all duration-300">
-      <Link to={`/producto/${p.id}`} className="relative aspect-square bg-[var(--mist)] flex items-center justify-center p-5 overflow-hidden">
+      <Link to={`/producto/${p.id}`} className="relative aspect-[4/5] bg-[var(--mist)] flex items-center justify-center p-2 sm:p-3 overflow-hidden">
         {p.imagen
-          ? <img src={p.imagen} alt={p.nombre} className="max-h-full object-contain group-hover:scale-105 transition duration-500" />
+          ? <img src={p.imagen} alt={p.nombre} className="h-full w-full object-contain group-hover:scale-105 transition duration-500" />
           : <Smartphone className="w-16 h-16 text-gray-300" />}
         <span className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-[0.1em] ${BADGE_CLR[p.estado]}`}>{p.estado}</span>
         {isPromo && <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md bg-red-600 text-white text-[9px] font-bold animate-pulse">PROMO</span>}

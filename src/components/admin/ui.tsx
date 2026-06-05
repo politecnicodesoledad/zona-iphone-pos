@@ -60,6 +60,28 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
+export function DateTriple({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const d = value ? new Date(value + "T12:00:00") : new Date();
+  const year = Number.isFinite(d.getTime()) ? d.getFullYear() : new Date().getFullYear();
+  const month = Number.isFinite(d.getTime()) ? d.getMonth() + 1 : new Date().getMonth() + 1;
+  const day = Number.isFinite(d.getTime()) ? d.getDate() : new Date().getDate();
+  const days = new Date(year, month, 0).getDate();
+  const set = (p: Partial<{ y: number; m: number; d: number }>) => {
+    const y = p.y ?? year;
+    const m = p.m ?? month;
+    const max = new Date(y, m, 0).getDate();
+    const dd = Math.min(p.d ?? day, max);
+    onChange(`${y}-${String(m).padStart(2, "0")}-${String(dd).padStart(2, "0")}`);
+  };
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <Select value={month} onChange={e => set({ m: +e.target.value })}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{new Date(2024, i, 1).toLocaleDateString("es-CO", { month: "short" })}</option>)}</Select>
+      <Select value={day} onChange={e => set({ d: +e.target.value })}>{Array.from({ length: days }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</Select>
+      <Select value={year} onChange={e => set({ y: +e.target.value })}>{Array.from({ length: 8 }, (_, i) => new Date().getFullYear() + 1 - i).map(y => <option key={y} value={y}>{y}</option>)}</Select>
+    </div>
+  );
+}
+
 // Modal con header sticky + body scrollable + footer opcional sticky.
 export function Modal({
   open, onClose, title, children, size = "md", footer,
