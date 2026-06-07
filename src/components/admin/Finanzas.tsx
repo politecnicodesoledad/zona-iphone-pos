@@ -213,6 +213,12 @@ function Canceladas() {
   const [ventas, setVentas] = useVentas();
   const cancel = ventas.filter(v => v.cancelada);
   const total = cancel.reduce((s, v) => s + v.total, 0);
+  function borrarDefinitivo(v: Venta) {
+    const pin = prompt("PIN para eliminar definitivamente:");
+    if (pin !== "0011") return alert("PIN incorrecto");
+    if (!confirm(`¿Eliminar definitivamente ${v.factura} del historial?`)) return;
+    setVentas(prev => prev.filter(x => x.id !== v.id));
+  }
   return (
     <div className="space-y-4">
       <div className="grid md:grid-cols-2 gap-4">
@@ -237,7 +243,7 @@ function Canceladas() {
                   <td className="text-xs">{v.cliente?.nombre || "—"}</td>
                   <td className="text-right line-through text-gray-500">{fmtCOP(v.total)}</td>
                   <td><span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] rounded font-bold">CANCELADA</span></td>
-                  <td className="text-right text-[10px] text-gray-400">No se elimina</td>
+                  <td className="text-right"><button title="Eliminar definitivamente" onClick={() => borrarDefinitivo(v)} className="text-red-600 px-2"><Trash2 className="w-4 h-4" /></button></td>
                 </tr>
               ))}
             </tbody>
