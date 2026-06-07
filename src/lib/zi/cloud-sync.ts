@@ -186,7 +186,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
       const { data, error } = await ziSupabase.from(`zi_${c.key}`).select("data");
       if (error) throw new Error(`${c.key}: ${error.message}`);
       const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(c.key));
-      const arr = removeDeleted(options.merge ? mergeById(c.get() as any[], remote, isDirty(c.key)) : remote, deleted.get(c.key));
+      const arr = removeDeleted(options.merge && isDirty(c.key) ? mergeById(c.get() as any[], remote, true) : remote, deleted.get(c.key));
       c.set(arr);
       details.push(`✓ ${c.key}: ${arr.length}`);
     }
@@ -194,7 +194,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
       const { data, error } = await ziSupabase.from(`zi_${k}`).select("data");
       if (error) throw new Error(`${k}: ${error.message}`);
       const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(k));
-      const arr = removeDeleted(options.merge ? mergeById(readLS<any>(k), remote, isDirty(k)) : remote, deleted.get(k));
+      const arr = removeDeleted(options.merge && isDirty(k) ? mergeById(readLS<any>(k), remote, true) : remote, deleted.get(k));
       writeLS(k, arr);
       details.push(`✓ ${k}: ${arr.length}`);
     }
