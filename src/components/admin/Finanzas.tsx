@@ -62,6 +62,13 @@ function Historial() {
     setVentas(prev => prev.map(v => v.id === pinModal!.id ? { ...v, cancelada: true, canceladaEn: Date.now(), razonCancelacion: "Cancelada desde historial" } : v));
     setPinModal(null); setPin(""); setPinErr(""); setDetail(null);
   }
+  function borrarVentaDefinitivo(v: Venta) {
+    const p = prompt("PIN para eliminar definitivamente:");
+    if (p !== "0011") return alert("PIN incorrecto");
+    if (!confirm(`¿Eliminar definitivamente ${v.factura}?`)) return;
+    setVentas(prev => prev.filter(x => x.id !== v.id));
+    setDetail(null);
+  }
   function sendWhatsapp(v: Venta) {
     const phone = (v.cliente?.telefono || cfg.whatsapp).replace(/\D/g, "");
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(facturaWhatsappText(v, cfg))}`, "_blank");
@@ -138,6 +145,7 @@ function Historial() {
                       <button title="Reimprimir" className="text-[var(--gold)] px-2" onClick={() => generarFacturaPDF(v, cfg)}><Printer className="w-4 h-4" /></button>
                       <button title="Enviar por WhatsApp" className="text-emerald-600 px-2" onClick={() => sendWhatsapp(v)}><MessageCircle className="w-4 h-4" /></button>
                       <button title="Cancelar" className="text-red-600 px-2" onClick={() => setPinModal(v)}><Trash2 className="w-4 h-4" /></button>
+                      <button title="Eliminar definitivo" className="text-red-800 px-2 text-xs font-black" onClick={() => borrarVentaDefinitivo(v)}>✕</button>
                     </td>
                   </tr>;
                 })}
@@ -184,6 +192,7 @@ function Historial() {
             {detail.asesor && <div className="text-xs">Atendió: <b>{detail.asesor}</b></div>}
             <div className="flex gap-2 pt-3 border-t border-[var(--line)]">
               <Btn variant="danger" onClick={() => setPinModal(detail)}><Trash2 className="inline w-3 h-3" /> Cancelar</Btn>
+              <Btn variant="ghost" onClick={() => borrarVentaDefinitivo(detail)}><Trash2 className="inline w-3 h-3" /> Eliminar historial</Btn>
               {detail.cliente?.telefono &&
                 <Btn variant="ok" onClick={() => sendWhatsapp(detail)}>
                   <MessageCircle className="inline w-3 h-3" /> WhatsApp
@@ -213,6 +222,12 @@ function Canceladas() {
   const [ventas, setVentas] = useVentas();
   const cancel = ventas.filter(v => v.cancelada);
   const total = cancel.reduce((s, v) => s + v.total, 0);
+  function borrarDefinitivo(v: Venta) {
+    const pin = prompt("PIN para eliminar definitivamente:");
+    if (pin !== "0011") return alert("PIN incorrecto");
+    if (!confirm(`¿Eliminar definitivamente ${v.factura} del historial?`)) return;
+    setVentas(prev => prev.filter(x => x.id !== v.id));
+  }
   return (
     <div className="space-y-4">
       <div className="grid md:grid-cols-2 gap-4">
@@ -237,7 +252,7 @@ function Canceladas() {
                   <td className="text-xs">{v.cliente?.nombre || "—"}</td>
                   <td className="text-right line-through text-gray-500">{fmtCOP(v.total)}</td>
                   <td><span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] rounded font-bold">CANCELADA</span></td>
-                  <td className="text-right text-[10px] text-gray-400">No se elimina</td>
+                  <td className="text-right"><button title="Eliminar definitivamente" onClick={() => borrarDefinitivo(v)} className="text-red-600 px-2"><Trash2 className="w-4 h-4" /></button></td>
                 </tr>
               ))}
             </tbody>

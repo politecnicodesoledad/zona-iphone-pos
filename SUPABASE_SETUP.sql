@@ -28,6 +28,14 @@ create table if not exists public.zi_proveedores   (id text primary key, data js
 create table if not exists public.zi_empleados     (id text primary key, data jsonb not null, updated_at timestamptz default now());
 create table if not exists public.zi_vendidos      (id text primary key, data jsonb not null, updated_at timestamptz default now());
 
+-- Tumbas de borrado: evita que registros eliminados reaparezcan al sincronizar otro dispositivo.
+create table if not exists public.zi_deletions (
+  collection text not null,
+  item_id text not null,
+  deleted_at timestamptz not null default now(),
+  primary key (collection, item_id)
+);
+
 -- Locales configurables (la app también guarda el estado en zi_config para funcionar rápido en SPA)
 create table if not exists public.zi_locales (
   id text primary key,
@@ -86,7 +94,7 @@ begin
     select unnest(array[
       'zi_config','zi_productos','zi_otros','zi_ventas','zi_gastos',
       'zi_clientes','zi_proveedores','zi_empleados','zi_vendidos',
-      'zi_counters','zi_galeria','zi_locales'
+      'zi_counters','zi_galeria','zi_locales','zi_deletions'
     ])
   loop
     execute format('grant select, insert, update, delete on public.%I to anon, authenticated', t);
