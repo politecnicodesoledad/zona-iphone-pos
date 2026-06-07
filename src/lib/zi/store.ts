@@ -132,7 +132,7 @@ function subscribe(cb: () => void) {
 }
 
 function useKey<T>(key: string, fallback: T): [T, (v: T | ((p: T) => T)) => void] {
-  const get = useCallback(() => read(key, fallback), [key]);
+  const get = useCallback(() => cleanValueForKey(key, read(key, fallback)), [key]);
   const value = useSyncExternalStore(subscribe, get, () => fallback);
   const set = useCallback((v: T | ((p: T) => T)) => {
     const prev = read(key, fallback);
