@@ -17,6 +17,11 @@ const RAW_COLLECTIONS = ["otros", "proveedores", "empleados"] as const;
 
 let applyingCloud = false;
 
+function setApplyingCloud(v: boolean) {
+  applyingCloud = v;
+  if (typeof window !== "undefined") (window as any).__ziApplyingCloud = v;
+}
+
 function readLS<T = unknown>(key: string): T[] {
   try { return JSON.parse(localStorage.getItem(`zi_${key}`) || "[]") as T[]; } catch { return []; }
 }
@@ -156,7 +161,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
   }
   const details: string[] = [];
   try {
-    applyingCloud = true;
+    setApplyingCloud(true);
     const deleted = await readCloudDeletions();
     const { data: cfgRow } = await ziSupabase.from("zi_config").select("data").eq("id", "singleton").maybeSingle();
     if (cfgRow?.data) {
@@ -187,6 +192,6 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
   } catch (e: any) {
     return { ok: false, message: e.message || String(e), details };
   } finally {
-    applyingCloud = false;
+    setApplyingCloud(false);
   }
 }
