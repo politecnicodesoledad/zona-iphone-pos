@@ -78,6 +78,28 @@ function write<T>(key: string, value: T) {
   window.dispatchEvent(new StorageEvent("storage", { key }));
 }
 
+function cleanValueForKey<T>(key: string, value: T): T {
+  const k = cloudKey(key);
+  if ((k === "productos" || k === "otros") && Array.isArray(value)) {
+    return value.filter((it: any) => Number(it?.stock || 0) > 0) as T;
+  }
+  return value;
+}
+
+function rememberDeleted(key: string, prev: unknown, next: unknown) {
+  if (!Array.isArray(prev) || !Array.isArray(next)) return;
+  const before = new Set(prev.map((it: any) => it?.id).filter(Boolean));
+  const after = new Set(next.map((it: any) => it?.id).filter(Boolean));
+  const removed = [...before].filter((id) => !after.has(id));
+  if (removed.length === 0) return;
+  const tombKey = `zi_deleted_${cloudKey(key)}`;
+  const now = Date.now();
+  const existing = read<{ id: string; at: number }[]>(tombKey, []).filter((x) => now - (x.at || 0) < 30 * 86400000);
+  const map = new Map(existing.map((x) => [x.id, x]));
+  removed.forEach((id) => map.set(String(id), { id: String(id), at: now }));
+  write(tombKey, [...map.values()]);
+}
+
 let cloudBooted = false;
 let cloudRuntimeStarted = false;
 function cloudKey(key: string) { return key.startsWith("zi_") ? key.slice(3) : key === KEYS.facturaNum ? "facturaNum" : key; }
@@ -109,7 +131,8 @@ function useKey<T>(key: string, fallback: T): [T, (v: T | ((p: T) => T)) => void
   const value = useSyncExternalStore(subscribe, get, () => fallback);
   const set = useCallback((v: T | ((p: T) => T)) => {
     const prev = read(key, fallback);
-    const next = typeof v === "function" ? (v as (p: T) => T)(prev) : v;
+    const next = cleanValueForKey(key, typeof v === "function" ? (v as (p: T) => T)(prev) : v);
+    rememberDeleted(key, prev, next);
     write(key, next);
     queueCloudSync(key, next);
     emit();
@@ -154,17 +177,17 @@ export const useFacturaNum = () => useKey<number>(KEYS.facturaNum, 1);
 export const Store = {
   config: () => ({ ...DEFAULT_CONFIG, ...read<ZIConfig>(KEYS.config, DEFAULT_CONFIG) }),
   productos: () => read<Producto[]>(KEYS.productos, []),
-  setProductos: (v: Producto[]) => { write(KEYS.productos, v); queueCloudSync(KEYS.productos, v); emit(); },
+  setProductos: (v: Producto[]) => { const prev = read<Producto[]>(KEYS.productos, []); const next = cleanValueForKey(KEYS.productos, v); rememberDeleted(KEYS.productos, prev, next); write(KEYS.productos, next); queueCloudSync(KEYS.productos, next); emit(); },
   otros: () => read<Producto[]>(KEYS.otros, []),
-  setOtros: (v: Producto[]) => { write(KEYS.otros, v); queueCloudSync(KEYS.otros, v); emit(); },
+  setOtros: (v: Producto[]) => { const prev = read<Producto[]>(KEYS.otros, []); const next = cleanValueForKey(KEYS.otros, v); rememberDeleted(KEYS.otros, prev, next); write(KEYS.otros, next); queueCloudSync(KEYS.otros, next); emit(); },
   vendidos: () => read<ProductoVendido[]>(KEYS.vendidos, []),
-  setVendidos: (v: ProductoVendido[]) => { write(KEYS.vendidos, v); queueCloudSync(KEYS.vendidos, v); emit(); },
+  setVendidos: (v: ProductoVendido[]) => { const prev = read<ProductoVendido[]>(KEYS.vendidos, []); rememberDeleted(KEYS.vendidos, prev, v); write(KEYS.vendidos, v); queueCloudSync(KEYS.vendidos, v); emit(); },
   ventas: () => read<Venta[]>(KEYS.ventas, []),
-  setVentas: (v: Venta[]) => { write(KEYS.ventas, v); queueCloudSync(KEYS.ventas, v); emit(); },
+  setVentas: (v: Venta[]) => { const prev = read<Venta[]>(KEYS.ventas, []); rememberDeleted(KEYS.ventas, prev, v); write(KEYS.ventas, v); queueCloudSync(KEYS.ventas, v); emit(); },
   gastos: () => read<Gasto[]>(KEYS.gastos, []),
-  setGastos: (v: Gasto[]) => { write(KEYS.gastos, v); queueCloudSync(KEYS.gastos, v); emit(); },
+  setGastos: (v: Gasto[]) => { const prev = read<Gasto[]>(KEYS.gastos, []); rememberDeleted(KEYS.gastos, prev, v); write(KEYS.gastos, v); queueCloudSync(KEYS.gastos, v); emit(); },
   clientes: () => read<ClienteCRM[]>(KEYS.clientes, []),
-  setClientes: (v: ClienteCRM[]) => { write(KEYS.clientes, v); queueCloudSync(KEYS.clientes, v); emit(); },
+  setClientes: (v: ClienteCRM[]) => { const prev = read<ClienteCRM[]>(KEYS.clientes, []); rememberDeleted(KEYS.clientes, prev, v); write(KEYS.clientes, v); queueCloudSync(KEYS.clientes, v); emit(); },
   facturaNum: () => read<number>(KEYS.facturaNum, 1),
   setFacturaNum: (v: number) => { write(KEYS.facturaNum, v); queueCloudSync(KEYS.facturaNum, v); emit(); },
 };
