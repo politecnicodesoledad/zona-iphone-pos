@@ -116,17 +116,15 @@ export async function pushAllToCloud(): Promise<SyncReport> {
 
     for (const c of COLLECTIONS) {
       const items = c.get();
-      if (items.length === 0) { details.push(`· ${c.key}: vacío`); continue; }
       const { error } = await upsertRows(c.key, items);
       if (error) throw new Error(`${c.key}: ${error.message}`);
-      details.push(`✓ ${c.key}: ${items.length}`);
+      details.push(items.length === 0 ? `✓ ${c.key}: vacío sincronizado` : `✓ ${c.key}: ${items.length}`);
     }
     for (const k of RAW_COLLECTIONS) {
       const items = readLS<{ id: string }>(k);
-      if (items.length === 0) { details.push(`· ${k}: vacío`); continue; }
       const { error } = await upsertRows(k, items);
       if (error) throw new Error(`${k}: ${error.message}`);
-      details.push(`✓ ${k}: ${items.length}`);
+      details.push(items.length === 0 ? `✓ ${k}: vacío sincronizado` : `✓ ${k}: ${items.length}`);
     }
     return { ok: true, message: "Datos subidos a la nube ✓", details };
   } catch (e: any) {
