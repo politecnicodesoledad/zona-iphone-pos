@@ -106,6 +106,7 @@ let cloudRuntimeStarted = false;
 function cloudKey(key: string) { return key.startsWith("zi_") ? key.slice(3) : key === KEYS.facturaNum ? "facturaNum" : key; }
 function queueCloudSync(key: string, value: unknown) {
   if (typeof window === "undefined") return;
+  if ((window as any).__ziApplyingCloud) return;
   if (!cloudBooted && key !== KEYS.config) return;
   const k = cloudKey(key);
   if (!(window as any).__ziApplyingCloud && k !== "config" && k !== "facturaNum") {
