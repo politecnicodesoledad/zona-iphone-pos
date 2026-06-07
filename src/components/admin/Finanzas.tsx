@@ -145,6 +145,7 @@ function Historial() {
                       <button title="Reimprimir" className="text-[var(--gold)] px-2" onClick={() => generarFacturaPDF(v, cfg)}><Printer className="w-4 h-4" /></button>
                       <button title="Enviar por WhatsApp" className="text-emerald-600 px-2" onClick={() => sendWhatsapp(v)}><MessageCircle className="w-4 h-4" /></button>
                       <button title="Cancelar" className="text-red-600 px-2" onClick={() => setPinModal(v)}><Trash2 className="w-4 h-4" /></button>
+                      <button title="Eliminar definitivo" className="text-red-800 px-2 text-xs font-black" onClick={() => borrarVentaDefinitivo(v)}>✕</button>
                     </td>
                   </tr>;
                 })}
