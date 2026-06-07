@@ -62,6 +62,13 @@ function Historial() {
     setVentas(prev => prev.map(v => v.id === pinModal!.id ? { ...v, cancelada: true, canceladaEn: Date.now(), razonCancelacion: "Cancelada desde historial" } : v));
     setPinModal(null); setPin(""); setPinErr(""); setDetail(null);
   }
+  function borrarVentaDefinitivo(v: Venta) {
+    const p = prompt("PIN para eliminar definitivamente:");
+    if (p !== "0011") return alert("PIN incorrecto");
+    if (!confirm(`¿Eliminar definitivamente ${v.factura}?`)) return;
+    setVentas(prev => prev.filter(x => x.id !== v.id));
+    setDetail(null);
+  }
   function sendWhatsapp(v: Venta) {
     const phone = (v.cliente?.telefono || cfg.whatsapp).replace(/\D/g, "");
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(facturaWhatsappText(v, cfg))}`, "_blank");
@@ -184,6 +191,7 @@ function Historial() {
             {detail.asesor && <div className="text-xs">Atendió: <b>{detail.asesor}</b></div>}
             <div className="flex gap-2 pt-3 border-t border-[var(--line)]">
               <Btn variant="danger" onClick={() => setPinModal(detail)}><Trash2 className="inline w-3 h-3" /> Cancelar</Btn>
+              <Btn variant="ghost" onClick={() => borrarVentaDefinitivo(detail)}><Trash2 className="inline w-3 h-3" /> Eliminar historial</Btn>
               {detail.cliente?.telefono &&
                 <Btn variant="ok" onClick={() => sendWhatsapp(detail)}>
                   <MessageCircle className="inline w-3 h-3" /> WhatsApp
