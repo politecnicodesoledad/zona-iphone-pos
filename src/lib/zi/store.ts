@@ -181,9 +181,9 @@ export const useFacturaNum = () => useKey<number>(KEYS.facturaNum, 1);
 // non-hook read for one-off operations
 export const Store = {
   config: () => ({ ...DEFAULT_CONFIG, ...read<ZIConfig>(KEYS.config, DEFAULT_CONFIG) }),
-  productos: () => read<Producto[]>(KEYS.productos, []),
+  productos: () => cleanValueForKey(KEYS.productos, read<Producto[]>(KEYS.productos, [])),
   setProductos: (v: Producto[]) => { const prev = read<Producto[]>(KEYS.productos, []); const next = cleanValueForKey(KEYS.productos, v); rememberDeleted(KEYS.productos, prev, next); write(KEYS.productos, next); queueCloudSync(KEYS.productos, next); emit(); },
-  otros: () => read<Producto[]>(KEYS.otros, []),
+  otros: () => cleanValueForKey(KEYS.otros, read<Producto[]>(KEYS.otros, [])),
   setOtros: (v: Producto[]) => { const prev = read<Producto[]>(KEYS.otros, []); const next = cleanValueForKey(KEYS.otros, v); rememberDeleted(KEYS.otros, prev, next); write(KEYS.otros, next); queueCloudSync(KEYS.otros, next); emit(); },
   vendidos: () => read<ProductoVendido[]>(KEYS.vendidos, []),
   setVendidos: (v: ProductoVendido[]) => { const prev = read<ProductoVendido[]>(KEYS.vendidos, []); rememberDeleted(KEYS.vendidos, prev, v); write(KEYS.vendidos, v); queueCloudSync(KEYS.vendidos, v); emit(); },
