@@ -107,6 +107,9 @@ function queueCloudSync(key: string, value: unknown) {
   if (typeof window === "undefined") return;
   if (!cloudBooted && key !== KEYS.config) return;
   const k = cloudKey(key);
+  if (!(window as any).__ziApplyingCloud && k !== "config" && k !== "facturaNum") {
+    localStorage.setItem(`zi_dirty_${k}`, String(Date.now()));
+  }
   window.setTimeout(() => {
     import("./cloud-sync").then(({ pushConfigToCloud, pushCollectionToCloud }) => {
       if (k === "config") return pushConfigToCloud(value as ZIConfig);
