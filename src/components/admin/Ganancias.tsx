@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useVentas, useGastos, useEmpleados, useProductos, useVendidos } from "@/lib/zi/store";
+import { useVentas, useGastos, useEmpleados, useProductos } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, rangeFor, type Periodo } from "@/lib/zi/format";
 import { Card, Stat, Btn, DateTriple } from "./ui";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
@@ -9,7 +9,6 @@ export function Ganancias() {
   const [gastos] = useGastos();
   const [empleados] = useEmpleados();
   const [productos] = useProductos();
-  const [vendidos] = useVendidos();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -21,19 +20,17 @@ export function Ganancias() {
   const data = useMemo(() => {
     const vs = ventas.filter(v => !v.cancelada && v.fecha >= start && v.fecha <= end && (local === "todos" || String(v.local) === local));
     const gs = gastos.filter(g => g.fecha >= start && g.fecha <= end && g.tipo === "operativo" && (local === "todos" || String(g.local) === local));
-    const ci = gastos.filter(g => g.fecha >= start && g.fecha <= end && g.tipo === "compra_inventario" && (local === "todos" || String(g.local) === local));
     const ingresos = vs.reduce((s, v) => s + v.total, 0);
     const costoVendido = vs.reduce((s, v) => s + v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0), 0);
     const operativos = gs.reduce((s, g) => s + g.monto, 0);
-    const inversionActiva = productos.filter(p => local === "todos" || String(p.local) === local).reduce((s, p) => s + p.costo * Math.max(0, p.stock), 0);
-    const inversionVendida = vendidos.filter(v => (v.fechaVenta || v.fechaArchivado) >= start && (v.fechaVenta || v.fechaArchivado) <= end).reduce((s, v) => s + v.costo * (v.cantidad || 1), 0);
-    const inversion = inversionActiva + inversionVendida;
+    const inversionActiva = productos.filter(p => p.stock > 0 && (local === "todos" || String(p.local) === local)).reduce((s, p) => s + (p.costo || 0) * Math.max(0, p.stock || 0), 0);
+    const inversion = inversionActiva + costoVendido;
     const salarios = empleados.reduce((s, e) =>
       s + e.historialPagos.filter(p => p.fecha >= start && p.fecha <= end).reduce((a, p) => a + p.monto, 0), 0);
     const gananciaBruta = ingresos - costoVendido;
     const neta = gananciaBruta - operativos - salarios;
-    return { vs, ingresos, costoVendido, operativos, inversion, salarios, gananciaBruta, neta };
-  }, [ventas, gastos, empleados, productos, vendidos, start, end, local]);
+    return { vs, ingresos, costoVendido, operativos, inversionActiva, inversion, salarios, gananciaBruta, neta };
+  }, [ventas, gastos, empleados, productos, start, end, local]);
 
   // por asesor
   const porAsesor = useMemo(() => {
@@ -89,7 +86,7 @@ export function Ganancias() {
       </Card>
 
       <div className="grid md:grid-cols-3 gap-4">
-        <Stat label="💰 Inversión en productos" value={fmtCOP(data.inversion)} hint="Inventario activo + costo vendido del período" />
+        <Stat label="💰 Inversión en productos" value={fmtCOP(data.inversion)} hint={`Activo ${fmtCOP(data.inversionActiva)} + vendido ${fmtCOP(data.costoVendido)}`} />
         <Stat label="📈 Ingresos totales" value={fmtCOP(data.ingresos)} hint={`${data.vs.length} ventas`} />
         <Stat label="🟢 Ganancia neta" value={fmtCOP(data.neta)} color={data.neta < 0 ? "#ef4444" : "var(--gold)"} />
       </div>

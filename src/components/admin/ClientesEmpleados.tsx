@@ -285,6 +285,7 @@ function Empleados() {
     setEmp(prev => prev.map(x => x.id === e.id ? { ...x, historialPagos: x.historialPagos.filter((_, i) => i !== idx) } : x));
     setPago(cur => cur ? { e: { ...cur.e, historialPagos: cur.e.historialPagos.filter((_, i) => i !== idx) } } : cur);
   }
+  const pagoEmpleado = pago ? emp.find(x => x.id === pago.e.id) || pago.e : null;
 
   return (
     <div className="space-y-4">
@@ -326,8 +327,8 @@ function Empleados() {
         )}
       </Modal>
 
-      <Modal open={!!pago} onClose={() => setPago(null)} title={pago ? `Pago: ${pago.e.nombre}` : ""}>
-        {pago && <PagoForm e={pago.e} onSave={registrarPago} onDelete={borrarPago} />}
+      <Modal open={!!pagoEmpleado} onClose={() => setPago(null)} title={pagoEmpleado ? `Pago: ${pagoEmpleado.nombre}` : ""} size="lg">
+        {pagoEmpleado && <PagoForm e={pagoEmpleado} onSave={registrarPago} onDelete={borrarPago} />}
       </Modal>
     </div>
   );
@@ -336,6 +337,7 @@ function Empleados() {
 function PagoForm({ e, onSave, onDelete }: { e: Empleado; onSave: (e: Empleado, monto: number, desc: string) => void; onDelete: (e: Empleado, idx: number) => void }) {
   const [monto, setMonto] = useState(e.monto);
   const [desc, setDesc] = useState("Pago quincenal");
+  const totalPagado = e.historialPagos.reduce((s, p) => s + p.monto, 0);
   return (
     <div className="space-y-3">
       <Field label="Monto"><Input type="number" value={monto} onChange={ev => setMonto(+ev.target.value)} /></Field>
@@ -343,9 +345,12 @@ function PagoForm({ e, onSave, onDelete }: { e: Empleado; onSave: (e: Empleado, 
       <Btn onClick={() => onSave(e, monto, desc)} className="w-full">💾 Registrar pago</Btn>
       {e.historialPagos.length > 0 && (
         <div className="mt-3">
-          <div className="text-xs uppercase text-gray-500 mb-1">Historial</div>
-          <ul className="text-xs space-y-1 max-h-40 overflow-auto">
-            {e.historialPagos.map((p, idx) => ({ p, idx })).reverse().slice(0, 10).map(({ p, idx }) => <li key={idx} className="flex items-center justify-between gap-2"><span>{fmtDate(p.fecha)} {p.descripcion}</span><span className="ml-auto text-[var(--gold)]">{fmtCOP(p.monto)}</span><button onClick={() => onDelete(e, idx)} className="text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></li>)}
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs uppercase text-gray-500">Historial completo</div>
+            <div className="text-xs font-bold text-[var(--gold-dark)]">Total: {fmtCOP(totalPagado)}</div>
+          </div>
+          <ul className="text-xs space-y-1 max-h-72 overflow-auto pr-1">
+            {e.historialPagos.map((p, idx) => ({ p, idx })).reverse().map(({ p, idx }) => <li key={idx} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--line)] px-2 py-1.5"><span>{fmtDate(p.fecha)} {p.descripcion}</span><span className="ml-auto text-[var(--gold)] font-semibold">{fmtCOP(p.monto)}</span><button title="Eliminar pago" onClick={() => onDelete(e, idx)} className="text-red-600 hover:text-red-700"><Trash2 className="w-3.5 h-3.5" /></button></li>)}
           </ul>
         </div>
       )}
