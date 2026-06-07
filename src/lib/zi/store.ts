@@ -87,6 +87,7 @@ function cleanValueForKey<T>(key: string, value: T): T {
 }
 
 function rememberDeleted(key: string, prev: unknown, next: unknown) {
+  if (typeof window !== "undefined" && (window as any).__ziApplyingCloud) return;
   if (!Array.isArray(prev) || !Array.isArray(next)) return;
   const before = new Set(prev.map((it: any) => it?.id).filter(Boolean));
   const after = new Set(next.map((it: any) => it?.id).filter(Boolean));
