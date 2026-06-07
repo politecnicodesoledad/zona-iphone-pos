@@ -27,17 +27,37 @@ function writeLS(key: string, v: unknown) {
 
 export interface SyncReport { ok: boolean; message: string; details?: string[] }
 
-const DELETE_MISSING_ON_PUSH = new Set(["productos", "otros"]);
+const DELETE_MISSING_ON_PUSH = new Set(["productos", "otros", "vendidos", "ventas", "gastos", "clientes", "proveedores", "empleados"]);
+
+async function recordCloudDeletion(key: string, id: string, at = Date.now()) {
+  try {
+    await ziSupabase.from("zi_deletions").upsert(
+      { collection: key, item_id: id, deleted_at: new Date(at).toISOString() },
+      { onConflict: "collection,item_id" },
+    );
+  } catch { /* zi_deletions puede no existir hasta correr el SQL nuevo */ }
+}
+
+async function pushLocalTombstones(key: string) {
+  const tombstones = readLS<{ id: string; at: number }>(`deleted_${key}`);
+  if (tombstones.length === 0) return;
+  await Promise.all(tombstones.map((x) => recordCloudDeletion(key, x.id, x.at)));
+  await Promise.all(tombstones.map((x) => ziSupabase.from(`zi_${key}`).delete().eq("id", x.id)));
+}
 
 async function deleteMissingRows(key: string, ids: string[]) {
   if (!DELETE_MISSING_ON_PUSH.has(key)) return;
   const { data } = await ziSupabase.from(`zi_${key}`).select("id");
   const keep = new Set(ids);
   const missing = (data || []).map((r: any) => r.id).filter((id: string) => !keep.has(id));
-  if (missing.length) await Promise.all(missing.map((id: string) => ziSupabase.from(`zi_${key}`).delete().eq("id", id)));
+  if (missing.length) {
+    await Promise.all(missing.map((id: string) => ziSupabase.from(`zi_${key}`).delete().eq("id", id)));
+    await Promise.all(missing.map((id: string) => recordCloudDeletion(key, id)));
+  }
 }
 
 async function upsertRows(key: string, items: any[]) {
+  await pushLocalTombstones(key);
   const rows = items.filter((it) => it?.id).map((it) => ({
     id: it.id,
     data: it,
@@ -113,6 +133,23 @@ function mergeById<T extends { id: string }>(local: T[], remote: T[]) {
   return Array.from(m.values());
 }
 
+async function readCloudDeletions() {
+  const out = new Map<string, Set<string>>();
+  try {
+    const { data } = await ziSupabase.from("zi_deletions").select("collection,item_id");
+    (data || []).forEach((r: any) => {
+      if (!out.has(r.collection)) out.set(r.collection, new Set());
+      out.get(r.collection)!.add(r.item_id);
+    });
+  } catch { /* tabla opcional para instalaciones antiguas */ }
+  return out;
+}
+
+function removeDeleted<T extends { id?: string }>(items: T[], deleted?: Set<string>) {
+  if (!deleted || deleted.size === 0) return items;
+  return items.filter((it) => !it?.id || !deleted.has(it.id));
+}
+
 export async function pullAllFromCloud(options: { merge?: boolean; silent?: boolean } = {}): Promise<SyncReport> {
   if (!(await ziCloudReady())) {
     return { ok: false, message: "El schema no está creado en Supabase. Pega SUPABASE_SETUP.sql primero." };
@@ -120,6 +157,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
   const details: string[] = [];
   try {
     applyingCloud = true;
+    const deleted = await readCloudDeletions();
     const { data: cfgRow } = await ziSupabase.from("zi_config").select("data").eq("id", "singleton").maybeSingle();
     if (cfgRow?.data) {
       localStorage.setItem("zi_config", JSON.stringify({ ...DEFAULT_CONFIG, ...cfgRow.data }));
@@ -131,16 +169,16 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
     for (const c of COLLECTIONS) {
       const { data, error } = await ziSupabase.from(`zi_${c.key}`).select("data");
       if (error) throw new Error(`${c.key}: ${error.message}`);
-      const remote = (data || []).map((r: any) => r.data);
-      const arr = options.merge ? mergeById(c.get() as any[], remote) : remote;
+      const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(c.key));
+      const arr = removeDeleted(options.merge ? mergeById(c.get() as any[], remote) : remote, deleted.get(c.key));
       c.set(arr);
       details.push(`✓ ${c.key}: ${arr.length}`);
     }
     for (const k of RAW_COLLECTIONS) {
       const { data, error } = await ziSupabase.from(`zi_${k}`).select("data");
       if (error) throw new Error(`${k}: ${error.message}`);
-      const remote = (data || []).map((r: any) => r.data);
-      const arr = options.merge ? mergeById(readLS<any>(k), remote) : remote;
+      const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(k));
+      const arr = removeDeleted(options.merge ? mergeById(readLS<any>(k), remote) : remote, deleted.get(k));
       writeLS(k, arr);
       details.push(`✓ ${k}: ${arr.length}`);
     }
