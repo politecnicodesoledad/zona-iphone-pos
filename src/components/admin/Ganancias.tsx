@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useVentas, useGastos, useEmpleados, useProductos } from "@/lib/zi/store";
+import { useVentas, useGastos, useEmpleados, useProductos, useOtros } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, rangeFor, type Periodo } from "@/lib/zi/format";
 import { Card, Stat, Btn, DateTriple } from "./ui";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
@@ -9,6 +9,7 @@ export function Ganancias() {
   const [gastos] = useGastos();
   const [empleados] = useEmpleados();
   const [productos] = useProductos();
+  const [otros] = useOtros();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -23,14 +24,15 @@ export function Ganancias() {
     const ingresos = vs.reduce((s, v) => s + v.total, 0);
     const costoVendido = vs.reduce((s, v) => s + v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0), 0);
     const operativos = gs.reduce((s, g) => s + g.monto, 0);
-    const inversionActiva = productos.filter(p => p.stock > 0 && (local === "todos" || String(p.local) === local)).reduce((s, p) => s + (p.costo || 0) * Math.max(0, p.stock || 0), 0);
+    const inventario = [...productos, ...otros];
+    const inversionActiva = inventario.filter(p => p.stock > 0 && (local === "todos" || String(p.local) === local)).reduce((s, p) => s + (p.costo || 0) * Math.max(0, p.stock || 0), 0);
     const inversion = inversionActiva + costoVendido;
     const salarios = empleados.reduce((s, e) =>
       s + e.historialPagos.filter(p => p.fecha >= start && p.fecha <= end).reduce((a, p) => a + p.monto, 0), 0);
     const gananciaBruta = ingresos - costoVendido;
     const neta = gananciaBruta - operativos - salarios;
     return { vs, ingresos, costoVendido, operativos, inversionActiva, inversion, salarios, gananciaBruta, neta };
-  }, [ventas, gastos, empleados, productos, start, end, local]);
+  }, [ventas, gastos, empleados, productos, otros, start, end, local]);
 
   // por asesor
   const porAsesor = useMemo(() => {
