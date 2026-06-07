@@ -50,6 +50,10 @@ async function pushLocalTombstones(key: string) {
   await Promise.all(tombstones.map((x) => ziSupabase.from(`zi_${key}`).delete().eq("id", x.id)));
 }
 
+function localDeletionSet(key: string) {
+  return new Set(readLS<{ id: string; at: number }>(`deleted_${key}`).map((x) => x.id));
+}
+
 async function deleteMissingRows(key: string, ids: string[]) {
   if (!DELETE_MISSING_ON_PUSH.has(key)) return;
   const { data } = await ziSupabase.from(`zi_${key}`).select("id");
@@ -120,8 +124,7 @@ export async function pushAllToCloud(): Promise<SyncReport> {
     for (const k of RAW_COLLECTIONS) {
       const items = readLS<{ id: string }>(k);
       if (items.length === 0) { details.push(`· ${k}: vacío`); continue; }
-      const rows = items.map((it) => ({ id: it.id, data: it }));
-      const { error } = await ziSupabase.from(`zi_${k}`).upsert(rows);
+      const { error } = await upsertRows(k, items);
       if (error) throw new Error(`${k}: ${error.message}`);
       details.push(`✓ ${k}: ${items.length}`);
     }
@@ -147,6 +150,12 @@ async function readCloudDeletions() {
       out.get(r.collection)!.add(r.item_id);
     });
   } catch { /* tabla opcional para instalaciones antiguas */ }
+  [...COLLECTIONS.map((c) => c.key), ...RAW_COLLECTIONS].forEach((key) => {
+    const local = localDeletionSet(key);
+    if (local.size === 0) return;
+    if (!out.has(key)) out.set(key, new Set());
+    local.forEach((id) => out.get(key)!.add(id));
+  });
   return out;
 }
 
