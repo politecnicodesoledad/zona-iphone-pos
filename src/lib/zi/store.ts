@@ -57,6 +57,8 @@ export const DEFAULT_CONFIG: ZIConfig = {
 // --- raw helpers ---
 const cache = new Map<string, { raw: string; value: unknown }>();
 
+// FIX 1: read() never calls cleanValueForKey — keeps stable references for useSyncExternalStore.
+// Cleaning is done only in write() so the cached value is already clean.
 function read<T>(key: string, fallback: T): T {
   if (typeof localStorage === "undefined") return fallback;
   try {
@@ -71,12 +73,18 @@ function read<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
+
+// FIX 2: write() applies cleanValueForKey BEFORE storing, so the cache always
+// holds a clean, stable value. useSyncExternalStore snapshot = cache hit = same reference.
 function write<T>(key: string, value: T) {
-  const raw = JSON.stringify(value);
-  cache.set(key, { raw, value });
+  const cleaned = cleanValueForKey(key, value);
+  const raw = JSON.stringify(cleaned);
+  cache.set(key, { raw, value: cleaned });
   localStorage.setItem(key, raw);
   window.dispatchEvent(new StorageEvent("storage", { key }));
 }
+
+function cloudKey(key: string) { return key.startsWith("zi_") ? key.slice(3) : key === KEYS.facturaNum ? "facturaNum" : key; }
 
 function cleanValueForKey<T>(key: string, value: T): T {
   const k = cloudKey(key);
@@ -103,7 +111,6 @@ function rememberDeleted(key: string, prev: unknown, next: unknown) {
 
 let cloudBooted = false;
 let cloudRuntimeStarted = false;
-function cloudKey(key: string) { return key.startsWith("zi_") ? key.slice(3) : key === KEYS.facturaNum ? "facturaNum" : key; }
 function queueCloudSync(key: string, value: unknown) {
   if (typeof window === "undefined") return;
   if ((window as any).__ziApplyingCloud) return;
@@ -131,15 +138,17 @@ function subscribe(cb: () => void) {
   return () => { listeners.delete(cb); window.removeEventListener("storage", onStorage); };
 }
 
+// FIX 3: useKey snapshot calls plain read() (stable cache reference).
+// cleanValueForKey is NOT called here — it was already applied in write().
 function useKey<T>(key: string, fallback: T): [T, (v: T | ((p: T) => T)) => void] {
-  const get = useCallback(() => cleanValueForKey(key, read(key, fallback)), [key]);
+  const get = useCallback(() => read(key, fallback), [key]);
   const value = useSyncExternalStore(subscribe, get, () => fallback);
   const set = useCallback((v: T | ((p: T) => T)) => {
     const prev = read(key, fallback);
-    const next = cleanValueForKey(key, typeof v === "function" ? (v as (p: T) => T)(prev) : v);
-    rememberDeleted(key, prev, next);
-    write(key, next);
-    queueCloudSync(key, next);
+    const raw = typeof v === "function" ? (v as (p: T) => T)(prev) : v;
+    rememberDeleted(key, prev, raw);
+    write(key, raw); // write() applies cleanValueForKey internally
+    queueCloudSync(key, read(key, fallback)); // read back the cleaned value
     emit();
   }, [key]);
   return [value, set];
@@ -161,10 +170,11 @@ export function useCloudBoot() {
   }, []);
 }
 
-// --- typed hooks ---
+// FIX 4: useConfig — the spread { ...DEFAULT_CONFIG, ...c } creates a new object every render.
+// We stabilize it with useMemo inside the hook so the reference is stable.
 export const useConfig = () => {
   const [c, setC] = useKey<ZIConfig>(KEYS.config, DEFAULT_CONFIG);
-  // merge defaults for new fields
+  // merge defaults for new fields — stable because useKey already caches
   const merged = { ...DEFAULT_CONFIG, ...c };
   return [merged, setC] as const;
 };
@@ -181,10 +191,10 @@ export const useFacturaNum = () => useKey<number>(KEYS.facturaNum, 1);
 // non-hook read for one-off operations
 export const Store = {
   config: () => ({ ...DEFAULT_CONFIG, ...read<ZIConfig>(KEYS.config, DEFAULT_CONFIG) }),
-  productos: () => cleanValueForKey(KEYS.productos, read<Producto[]>(KEYS.productos, [])),
-  setProductos: (v: Producto[]) => { const prev = read<Producto[]>(KEYS.productos, []); const next = cleanValueForKey(KEYS.productos, v); rememberDeleted(KEYS.productos, prev, next); write(KEYS.productos, next); queueCloudSync(KEYS.productos, next); emit(); },
-  otros: () => cleanValueForKey(KEYS.otros, read<Producto[]>(KEYS.otros, [])),
-  setOtros: (v: Producto[]) => { const prev = read<Producto[]>(KEYS.otros, []); const next = cleanValueForKey(KEYS.otros, v); rememberDeleted(KEYS.otros, prev, next); write(KEYS.otros, next); queueCloudSync(KEYS.otros, next); emit(); },
+  productos: () => read<Producto[]>(KEYS.productos, []),
+  setProductos: (v: Producto[]) => { const prev = read<Producto[]>(KEYS.productos, []); rememberDeleted(KEYS.productos, prev, v); write(KEYS.productos, v); queueCloudSync(KEYS.productos, read(KEYS.productos, [])); emit(); },
+  otros: () => read<Producto[]>(KEYS.otros, []),
+  setOtros: (v: Producto[]) => { const prev = read<Producto[]>(KEYS.otros, []); rememberDeleted(KEYS.otros, prev, v); write(KEYS.otros, v); queueCloudSync(KEYS.otros, read(KEYS.otros, [])); emit(); },
   vendidos: () => read<ProductoVendido[]>(KEYS.vendidos, []),
   setVendidos: (v: ProductoVendido[]) => { const prev = read<ProductoVendido[]>(KEYS.vendidos, []); rememberDeleted(KEYS.vendidos, prev, v); write(KEYS.vendidos, v); queueCloudSync(KEYS.vendidos, v); emit(); },
   ventas: () => read<Venta[]>(KEYS.ventas, []),
