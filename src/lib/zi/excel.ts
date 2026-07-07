@@ -6,7 +6,7 @@ function esc(v: unknown) {
 }
 
 export function exportarVentasExcel(ventas: Venta[], filename = "historial-ventas.xls") {
-  const rows = ventas.map(v => {
+  const rows = [...ventas].sort((a, b) => (b.fecha || 0) - (a.fecha || 0)).map(v => {
     const costo = v.productos.reduce((s, p) => s + (p.costo || 0) * p.cantidad, 0);
     const d = new Date(v.fecha);
     return [
@@ -61,7 +61,7 @@ export function exportarProductosExcel(productos: Producto[], filename = "produc
 export function exportarVendidosExcel(vendidos: ProductoVendido[], filename = "productos-vendidos.xls") {
   exportHtmlExcel(
     ["Fecha venta", "Nombre", "Categoría", "Cantidad", "Cliente", "Costo", "Precio", "Ganancia", "Detalle extra", "Observaciones"],
-    vendidos.map(v => [new Date(v.fechaVenta || v.fechaArchivado).toLocaleDateString("es-CO"), v.nombre, v.categoria, v.cantidad || 1, v.cliente || "—", v.costo, v.precio, v.gananciaPotencial, v.detalleExtra || "—", v.observaciones || "—"]),
+    [...vendidos].sort((a, b) => (b.fechaVenta || b.fechaArchivado || 0) - (a.fechaVenta || a.fechaArchivado || 0)).map(v => [new Date(v.fechaVenta || v.fechaArchivado).toLocaleDateString("es-CO"), v.nombre, v.categoria, v.cantidad || 1, v.cliente || "—", v.costo, v.precio, v.gananciaPotencial, v.detalleExtra || "—", v.observaciones || "—"]),
     filename,
   );
 }
@@ -94,7 +94,8 @@ export async function importarVentasDesdeExcel(file: File): Promise<Venta[]> {
       const total = num(r["Total Venta"]);
       const costoTotal = num(r["Costo Total"]);
       const tipoTxt = clean(r["Tipo pago"]).toLowerCase();
-      const factura = "#" + String(clean(r["Factura #"]) || idx + 1).replace(/^#/, "").padStart(5, "0");
+      const facturaRaw = clean(r["Factura #"]) || clean(r["Factura"]) || idx + 1;
+      const factura = "#" + String(facturaRaw).replace(/^#/, "").padStart(5, "0");
       const obs = clean(r["Observaciones"]);
       return {
         id: `import-${factura.replace("#", "")}`,

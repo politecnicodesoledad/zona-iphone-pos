@@ -17,6 +17,14 @@ export const maskCedula = (c?: string) => {
 
 export type Periodo = "hoy" | "semana" | "mes" | "anio" | "custom" | "todos";
 
+export function dateInputToTime(value: string, endOfDay = false) {
+  if (!value) return undefined;
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return undefined;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+  return Number.isFinite(d.getTime()) ? d.getTime() : undefined;
+}
+
 export function rangeFor(p: Periodo, from?: number, to?: number): [number, number] {
   const now = new Date();
   const start = new Date(now); const end = new Date(now);
