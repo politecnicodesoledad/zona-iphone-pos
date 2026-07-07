@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useProductos, useVentas, useGastos, useClientes, useFacturaNum, useConfig, useVendidos, Store, uid, fmtFactura } from "@/lib/zi/store";
+import { useProductos, useOtros, useVentas, useClientes, useFacturaNum, useConfig, useVendidos, Store, uid, fmtFactura } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
 import { facturaWhatsappText, generarFacturaPDF } from "@/lib/zi/pdf";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field, DateTriple } from "./ui";
@@ -10,14 +10,16 @@ interface Item extends VentaProducto { id: string; precioBase: number; }
 
 export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [productos] = useProductos();
+  const [otros] = useOtros();
   const [, setVentas] = useVentas();
-  const [, setGastos] = useGastos();
   const [, setClientes] = useClientes();
   const [num, setNum] = useFacturaNum();
   const [cfg] = useConfig();
 
   const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState("");
   const [items, setItems] = useState<Item[]>([]);
+  const [saving, setSaving] = useState(false);
   const [quickNombre, setQuickNombre] = useState("");
   const [quickCosto, setQuickCosto] = useState(0);
   const [quickPrecio, setQuickPrecio] = useState(0);
@@ -46,10 +48,10 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [fechaFactura, setFechaFactura] = useState(() => new Date().toISOString().slice(0, 16));
   const [pinFecha, setPinFecha] = useState("");
 
-  const disponibles = useMemo(() => productos.filter(p => p.stock > 0), [productos]);
+  const disponibles = useMemo(() => [...productos, ...otros].filter(p => p.stock > 0), [productos, otros]);
   const matches = useMemo(() => {
     const base = search ? disponibles.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase())) : disponibles;
-    return base.slice(0, search ? 8 : 12);
+    return base.slice(0, search ? 30 : 50);
   }, [disponibles, search]);
   const total = items.reduce((s, i) => s + i.subtotal, 0);
   const descuentoTotal = items.reduce((s, i) => s + (i.descuento || 0), 0);
@@ -57,11 +59,18 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const tRestante = total - tValor;
 
   function add(p: Producto) {
+    const already = items.filter(i => i.productoId === p.id).reduce((s, i) => s + i.cantidad, 0);
+    if (already >= p.stock) return alert("No hay más stock disponible para este producto.");
     setItems(prev => [...prev, {
       id: uid(), productoId: p.id, nombre: p.nombre, cantidad: 1,
       precioUnitario: p.precio, precioBase: p.precio, costo: p.costo, descuento: 0, subtotal: p.precio,
     }]);
-    setSearch("");
+    setSearch(""); setSelectedId("");
+  }
+  function addSelected() {
+    const p = disponibles.find(x => x.id === selectedId) || matches[0];
+    if (!p) return alert("Selecciona un producto del inventario");
+    add(p);
   }
   function addQuick() {
     if (!quickNombre.trim()) { alert("Escribe el nombre del producto personalizado"); return; }
@@ -84,6 +93,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   function removeItem(id: string) { setItems(prev => prev.filter(i => i.id !== id)); }
 
   async function finalizar() {
+    if (saving) return;
     if (items.length === 0) { alert("Agrega al menos un producto"); return; }
     const requiereCliente = tipoPago === "credito" || tipoPago === "tradein";
     if (requiereCliente && (!cNombre.trim() || !cTel.trim() || !cCedula.trim())) {
@@ -92,6 +102,10 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     if (retroMode && pinFecha !== "0011") { alert("PIN incorrecto para registrar venta con fecha manual"); return; }
     const fechaVenta = retroMode ? new Date(fechaFactura).getTime() : Date.now();
     if (!Number.isFinite(fechaVenta)) { alert("Fecha inválida"); return; }
+    const stockActual = [...Store.productos(), ...Store.otros()];
+    const sinStock = items.find((it) => !it.esRapido && it.cantidad > (stockActual.find(p => p.id === it.productoId)?.stock || 0));
+    if (sinStock) { alert(`Stock insuficiente para ${sinStock.nombre}`); return; }
+    setSaving(true);
     const { nextFacturaNumber } = await import("@/lib/zi/cloud-sync");
     const facturaNum = await nextFacturaNumber(num);
     const factura = fmtFactura(facturaNum);
@@ -112,13 +126,26 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     };
     // descontar stock + archivar si llega a 0
     const ps = Store.productos();
+    const os = Store.otros();
     const vendidosArr = Store.vendidos();
     let psNew = [...ps];
+    let osNew = [...os];
     items.forEach(it => {
       const idx = psNew.findIndex(p => p.id === it.productoId);
       if (idx >= 0) {
         const p = { ...psNew[idx], stock: Math.max(0, psNew[idx].stock - it.cantidad) };
         psNew[idx] = p;
+        if (p.stock <= 0) {
+          vendidosArr.push({
+            id: uid(), nombre: p.nombre, categoria: p.categoria, cantidad: it.cantidad, costo: it.costo, precio: it.precioUnitario,
+            gananciaPotencial: (it.precioUnitario - it.costo) * it.cantidad, fechaArchivado: Date.now(), fechaVenta,
+            ventaId: venta.id, cliente: venta.cliente?.nombre, detalleExtra: it.color, observaciones: obs, original: p,
+          });
+        }
+      } else if (osNew.findIndex(p => p.id === it.productoId) >= 0) {
+        const oidx = osNew.findIndex(p => p.id === it.productoId);
+        const p = { ...osNew[oidx], stock: Math.max(0, osNew[oidx].stock - it.cantidad) };
+        osNew[oidx] = p;
         if (p.stock <= 0) {
           vendidosArr.push({
             id: uid(), nombre: p.nombre, categoria: p.categoria, cantidad: it.cantidad, costo: it.costo, precio: it.precioUnitario,
@@ -136,7 +163,9 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
       }
     });
     psNew = psNew.filter(p => p.stock > 0);
+    osNew = osNew.filter(p => p.stock > 0);
     Store.setProductos(psNew);
+    Store.setOtros(osNew);
     Store.setVendidos(vendidosArr);
 
     setVentas(prev => [...prev, venta]);
@@ -166,6 +195,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     setCNombre(""); setCCedula(""); setCTel(""); setCInicial(0); setCCuotas(3);
     setTMarca(""); setTModelo(""); setTImei(""); setTValor(0);
     alert(`Venta ${factura} guardada ✓`);
+    setSaving(false);
   }
 
   function imprimir() {
@@ -194,17 +224,15 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
               <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del producto..." className="pl-9" />
             </div>
           </Field>
-          <div className="mt-2 text-[10px] uppercase tracking-widest text-gray-400 font-bold">{search ? "Resultados" : "Selecciona del inventario"}</div>
-          {matches.length > 0 && (
-            <div className="mt-2 border border-[var(--line)] rounded-lg divide-y divide-white/5">
-              {matches.map(p => (
-                <button key={p.id} onClick={() => add(p)} className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--mist)] flex justify-between items-center">
-                  <span>{p.nombre} <span className="text-gray-500 text-xs">({p.stock} disp.)</span></span>
-                  <span className="text-[var(--gold)] font-display text-lg">{fmtCOP(p.precio)}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="mt-3 grid md:grid-cols-[1fr_auto] gap-2 items-end">
+            <Field label={search ? "Resultados filtrados" : "Desplegar inventario"}>
+              <Select value={selectedId} onChange={e => setSelectedId(e.target.value)}>
+                <option value="">Selecciona un producto...</option>
+                {matches.map(p => <option key={p.id} value={p.id}>{p.nombre} · {p.stock} disp. · {fmtCOP(p.precio)}</option>)}
+              </Select>
+            </Field>
+            <Btn type="button" variant="ink" onClick={addSelected} className="h-10">Agregar</Btn>
+          </div>
         </Card>
 
         <Card>
@@ -329,7 +357,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
           <div className="text-xs uppercase text-gray-400 tracking-widest">Factura actual</div>
           <div className="font-display text-5xl text-[var(--gold)]">{fmtFactura(num)}</div>
         </Card>
-        <Btn onClick={finalizar} className="w-full py-4 text-base"><Plus className="inline w-4 h-4 -mt-0.5" /> Finalizar venta</Btn>
+        <Btn onClick={finalizar} disabled={saving} className="w-full py-4 text-base"><Plus className="inline w-4 h-4 -mt-0.5" /> {saving ? "Guardando..." : "Finalizar venta"}</Btn>
         <Btn variant="ghost" onClick={imprimir} className="w-full">🖨 Imprimir factura</Btn>
         <Btn variant="ok" onClick={enviarWhatsapp} className="w-full"><MessageCircle className="inline w-4 h-4 -mt-0.5" /> Enviar factura WhatsApp</Btn>
         <Btn variant="danger" onClick={cancelar} className="w-full">❌ Cancelar venta</Btn>
