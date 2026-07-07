@@ -35,8 +35,6 @@ function clearDirty(key: string) { localStorage.removeItem(`zi_dirty_${key}`); }
 
 export interface SyncReport { ok: boolean; message: string; details?: string[] }
 
-const DELETE_MISSING_ON_PUSH = new Set(["productos", "otros", "vendidos", "ventas", "gastos", "clientes", "proveedores", "empleados"]);
-
 async function recordCloudDeletion(key: string, id: string, at = Date.now()) {
   try {
     await ziSupabase.from("zi_deletions").upsert(
@@ -47,6 +45,7 @@ async function recordCloudDeletion(key: string, id: string, at = Date.now()) {
 }
 
 async function pushLocalTombstones(key: string) {
+  if (HISTORY_COLLECTIONS.has(key)) return;
   const tombstones = readLS<{ id: string; at: number }>(`deleted_${key}`);
   if (tombstones.length === 0) return;
   await Promise.all(tombstones.map((x) => recordCloudDeletion(key, x.id, x.at)));
@@ -57,16 +56,7 @@ function localDeletionSet(key: string) {
   return new Set(readLS<{ id: string; at: number }>(`deleted_${key}`).map((x) => x.id));
 }
 
-async function deleteMissingRows(key: string, ids: string[]) {
-  if (!DELETE_MISSING_ON_PUSH.has(key)) return;
-  const { data } = await ziSupabase.from(`zi_${key}`).select("id");
-  const keep = new Set(ids);
-  const missing = (data || []).map((r: any) => r.id).filter((id: string) => !keep.has(id));
-  if (missing.length) {
-    await Promise.all(missing.map((id: string) => ziSupabase.from(`zi_${key}`).delete().eq("id", id)));
-    await Promise.all(missing.map((id: string) => recordCloudDeletion(key, id)));
-  }
-}
+const HISTORY_COLLECTIONS = new Set(["ventas", "gastos", "vendidos"]);
 
 async function upsertRows(key: string, items: any[]) {
   await pushLocalTombstones(key);
@@ -77,7 +67,6 @@ async function upsertRows(key: string, items: any[]) {
     updated_at: new Date().toISOString(),
   }));
   const result = rows.length ? await ziSupabase.from(`zi_${key}`).upsert(rows) : ({ error: null } as any);
-  if (!result.error) await deleteMissingRows(key, rows.map((r) => r.id));
   if (!result.error) clearDirty(key);
   return result;
 }
@@ -148,11 +137,13 @@ async function readCloudDeletions() {
   try {
     const { data } = await ziSupabase.from("zi_deletions").select("collection,item_id");
     (data || []).forEach((r: any) => {
+      if (HISTORY_COLLECTIONS.has(r.collection)) return;
       if (!out.has(r.collection)) out.set(r.collection, new Set());
       out.get(r.collection)!.add(r.item_id);
     });
   } catch { /* tabla opcional para instalaciones antiguas */ }
   [...COLLECTIONS.map((c) => c.key), ...RAW_COLLECTIONS].forEach((key) => {
+    if (HISTORY_COLLECTIONS.has(key)) return;
     const local = localDeletionSet(key);
     if (local.size === 0) return;
     if (!out.has(key)) out.set(key, new Set());
@@ -164,6 +155,12 @@ async function readCloudDeletions() {
 function removeDeleted<T extends { id?: string }>(items: T[], deleted?: Set<string>) {
   if (!deleted || deleted.size === 0) return items;
   return items.filter((it) => !it?.id || !deleted.has(it.id));
+}
+
+function sortCollection(key: string, items: any[]) {
+  if (key === "ventas" || key === "gastos") return [...items].sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+  if (key === "vendidos") return [...items].sort((a, b) => (b.fechaVenta || b.fechaArchivado || 0) - (a.fechaVenta || a.fechaArchivado || 0));
+  return items;
 }
 
 export async function pullAllFromCloud(options: { merge?: boolean; silent?: boolean } = {}): Promise<SyncReport> {
@@ -187,8 +184,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
       if (error) throw new Error(`${c.key}: ${error.message}`);
       const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(c.key));
       const local = c.get() as any[];
-      const shouldKeepLocal = options.merge && (isDirty(c.key) || (remote.length === 0 && local.length > 0));
-      const arr = removeDeleted(shouldKeepLocal ? mergeById(local, remote, isDirty(c.key)) : remote, deleted.get(c.key));
+      const arr = sortCollection(c.key, removeDeleted(options.merge ? mergeById(local, remote, isDirty(c.key)) : remote, deleted.get(c.key)));
       c.set(arr);
       details.push(`✓ ${c.key}: ${arr.length}`);
     }
@@ -197,8 +193,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
       if (error) throw new Error(`${k}: ${error.message}`);
       const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(k));
       const local = readLS<any>(k);
-      const shouldKeepLocal = options.merge && (isDirty(k) || (remote.length === 0 && local.length > 0));
-      const arr = removeDeleted(shouldKeepLocal ? mergeById(local, remote, isDirty(k)) : remote, deleted.get(k));
+      const arr = sortCollection(k, removeDeleted(options.merge ? mergeById(local, remote, isDirty(k)) : remote, deleted.get(k)));
       writeLS(k, arr);
       details.push(`✓ ${k}: ${arr.length}`);
     }

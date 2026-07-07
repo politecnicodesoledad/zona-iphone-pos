@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { useVentas, useGastos, useEmpleados, useProductos, useOtros } from "@/lib/zi/store";
-import { fmtCOP, fmtDate, rangeFor, type Periodo } from "@/lib/zi/format";
+import { useVentas, useGastos, useEmpleados, useProductos, useOtros, useVendidos } from "@/lib/zi/store";
+import { fmtCOP, fmtDate, rangeFor, type Periodo, dateInputToTime } from "@/lib/zi/format";
+import { ventasConArchivados } from "@/lib/zi/sales-recovery";
 import { Card, Stat, Btn, DateTriple } from "./ui";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
@@ -10,16 +11,18 @@ export function Ganancias() {
   const [empleados] = useEmpleados();
   const [productos] = useProductos();
   const [otros] = useOtros();
+  const [vendidos] = useVendidos();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [local, setLocal] = useState<"todos" | "1" | "2">("todos");
   const [verDesglose, setVer] = useState(false);
 
-  const [start, end] = rangeFor(periodo, from ? new Date(from).getTime() : undefined, to ? new Date(to).getTime() + 86400000 : undefined);
+  const [start, end] = rangeFor(periodo, dateInputToTime(from), dateInputToTime(to, true));
+  const ventasBase = useMemo(() => ventasConArchivados(ventas, vendidos), [ventas, vendidos]);
 
   const data = useMemo(() => {
-    const vs = ventas.filter(v => !v.cancelada && v.fecha >= start && v.fecha <= end && (local === "todos" || String(v.local) === local));
+    const vs = ventasBase.filter(v => !v.cancelada && v.fecha >= start && v.fecha <= end && (local === "todos" || String(v.local) === local));
     const gs = gastos.filter(g => g.fecha >= start && g.fecha <= end && g.tipo === "operativo" && (local === "todos" || String(g.local) === local));
     const ingresos = vs.reduce((s, v) => s + v.total, 0);
     const costoVendido = vs.reduce((s, v) => s + v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0), 0);
@@ -32,7 +35,7 @@ export function Ganancias() {
     const gananciaBruta = ingresos - costoVendido;
     const neta = gananciaBruta - operativos - salarios;
     return { vs, ingresos, costoVendido, operativos, inversionActiva, inversion, salarios, gananciaBruta, neta };
-  }, [ventas, gastos, empleados, productos, otros, start, end, local]);
+  }, [ventasBase, gastos, empleados, productos, otros, start, end, local]);
 
   // por asesor
   const porAsesor = useMemo(() => {
@@ -44,17 +47,21 @@ export function Ganancias() {
       cur.ganancia += v.total - v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0);
       m.set(k, cur);
     });
-    return [...m.entries()];
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [data.vs]);
 
   // ventas por día
   const porDia = useMemo(() => {
-    const m = new Map<string, number>();
+    const m = new Map<string, { label: string; total: number; ts: number }>();
     data.vs.forEach(v => {
-      const k = fmtDate(v.fecha);
-      m.set(k, (m.get(k) || 0) + v.total);
+      const d = new Date(v.fecha);
+      d.setHours(0, 0, 0, 0);
+      const k = d.toISOString().slice(0, 10);
+      const cur = m.get(k) || { label: fmtDate(v.fecha), total: 0, ts: d.getTime() };
+      cur.total += v.total;
+      m.set(k, cur);
     });
-    return [...m.entries()];
+    return [...m.values()].sort((a, b) => a.ts - b.ts).map((x) => [x.label, x.total] as [string, number]);
   }, [data.vs]);
   const maxDia = Math.max(1, ...porDia.map(([, v]) => v));
   const chartData = porDia.slice(-14).map(([fecha, ventas]) => ({ fecha, ventas }));
@@ -177,7 +184,7 @@ export function Ganancias() {
                 <tr><th className="text-left py-2">Factura</th><th className="text-left">Fecha</th><th className="text-left">Cliente</th><th className="text-right">Total</th><th className="text-right">Ganancia</th><th>Tipo</th></tr>
               </thead>
               <tbody>
-                {data.vs.slice().reverse().slice(0, 50).map(v => {
+                {data.vs.slice(0, 50).map(v => {
                   const g = v.total - v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0);
                   return (
                     <tr key={v.id} className="border-b border-[var(--line)]">
