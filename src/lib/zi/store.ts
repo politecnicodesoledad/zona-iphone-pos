@@ -88,9 +88,6 @@ function cloudKey(key: string) { return key.startsWith("zi_") ? key.slice(3) : k
 
 function cleanValueForKey<T>(key: string, value: T): T {
   const k = cloudKey(key);
-  if ((k === "productos" || k === "otros") && Array.isArray(value)) {
-    return value.filter((it: any) => Number(it?.stock || 0) > 0) as T;
-  }
   return value;
 }
 
