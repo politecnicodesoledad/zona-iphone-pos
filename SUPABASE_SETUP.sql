@@ -110,6 +110,11 @@ insert into public.zi_locales (id, nombre, activo)
 values ('1', 'Local 1', true), ('2', 'Local 2', true)
 on conflict (id) do nothing;
 
+-- Limpieza de seguridad: NO permitimos que borrados antiguos oculten historial.
+-- Esto no elimina ventas/gastos/productos vendidos; solo quita marcas de borrado accidentales.
+delete from public.zi_deletions
+where collection in ('ventas', 'gastos', 'vendidos');
+
 -- =====================================================================
 -- LISTO ✓
 -- Ahora vuelve al panel admin → Configuración → Sincronización con la nube
