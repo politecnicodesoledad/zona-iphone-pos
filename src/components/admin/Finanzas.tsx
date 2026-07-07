@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
-import { useVentas, useGastos, useConfig, uid } from "@/lib/zi/store";
-import { fmtCOP, fmtDate, fmtDateTime, rangeFor, type Periodo, maskCedula } from "@/lib/zi/format";
+import { useVentas, useGastos, useConfig, useVendidos, uid } from "@/lib/zi/store";
+import { fmtCOP, fmtDate, fmtDateTime, rangeFor, type Periodo, maskCedula, dateInputToTime } from "@/lib/zi/format";
 import { generarFacturaPDF, exportarHistorialPDF, facturaWhatsappText } from "@/lib/zi/pdf";
 import { exportarVentasExcel, importarVentasDesdeExcel } from "@/lib/zi/excel";
+import { isVentaRecuperada, ventasConArchivados } from "@/lib/zi/sales-recovery";
 import { Card, Btn, Input, Select, Tabs, Field, Modal, Stat, DateTriple } from "./ui";
 import { Trash2, Printer, MessageCircle, Download } from "lucide-react";
 import type { Venta, Gasto } from "@/lib/zi/types";
@@ -38,6 +39,7 @@ function RetroVenta() {
 
 function Historial() {
   const [ventas, setVentas] = useVentas();
+  const [vendidos] = useVendidos();
   const [cfg] = useConfig();
   const [tipo, setTipo] = useState("todos");
   const [local, setLocal] = useState("todos");
@@ -48,14 +50,15 @@ function Historial() {
   const [pinModal, setPinModal] = useState<Venta | null>(null);
   const [pin, setPin] = useState(""); const [pinErr, setPinErr] = useState("");
 
-  const [start, end] = rangeFor(periodo, from ? new Date(from).getTime() : undefined, to ? new Date(to).getTime() + 86400000 : undefined);
-  const list = useMemo(() => ventas.filter(v =>
+  const [start, end] = rangeFor(periodo, dateInputToTime(from), dateInputToTime(to, true));
+  const baseVentas = useMemo(() => ventasConArchivados(ventas, vendidos), [ventas, vendidos]);
+  const list = useMemo(() => baseVentas.filter(v =>
     !v.cancelada &&
     (tipo === "todos" || v.tipo === tipo) &&
     (local === "todos" || String(v.local) === local) &&
     v.fecha >= start && v.fecha <= end &&
     (!q || v.factura.includes(q) || (v.cliente?.nombre || "").toLowerCase().includes(q.toLowerCase()))
-  ).reverse(), [ventas, tipo, local, start, end, q]);
+  ), [baseVentas, tipo, local, start, end, q]);
 
   function confirmCancel() {
     if (pin !== cfg.cancelPin) { setPinErr("PIN incorrecto"); return; }
@@ -63,6 +66,7 @@ function Historial() {
     setPinModal(null); setPin(""); setPinErr(""); setDetail(null);
   }
   function borrarVentaDefinitivo(v: Venta) {
+    if (isVentaRecuperada(v)) return alert("Esta venta fue reconstruida desde Productos vendidos. Para quitarla, edita o elimina el producto vendido asociado.");
     const p = prompt("PIN para eliminar definitivamente:");
     if (p !== "0011") return alert("PIN incorrecto");
     if (!confirm(`¿Eliminar definitivamente ${v.factura}?`)) return;
@@ -125,27 +129,28 @@ function Historial() {
 
       <Card>
         {list.length === 0 ? <p className="text-sm text-gray-500">Sin ventas en el período.</p> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-[var(--line)]">
+            <table className="w-full min-w-[980px] border-collapse text-sm">
               <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
-                <tr><th className="text-left py-2">Factura</th><th className="text-left">Fecha</th><th className="text-left">Cliente</th><th className="text-left">Teléfono</th><th className="text-right">Total</th><th className="text-right">Ganancia</th><th>Pago</th><th></th></tr>
+                <tr><th className="text-left px-3 py-3">Factura</th><th className="text-left px-3">Fecha</th><th className="text-left px-3">Cliente</th><th className="text-left px-3">Teléfono</th><th className="text-right px-3">Total</th><th className="text-right px-3">Ganancia</th><th className="px-3 text-left">Pago</th><th className="px-3"></th></tr>
               </thead>
               <tbody>
                 {list.map(v => {
                   const costo = v.productos.reduce((s, p) => s + (p.costo || 0) * p.cantidad, 0);
-                  return <tr key={v.id} className="border-b border-[var(--line)] hover:bg-[var(--mist)] cursor-pointer" onClick={() => setDetail(v)}>
-                    <td className="py-2 text-[var(--gold)] font-semibold">{v.factura}{v.fechaManual && <span className="ml-1 text-[9px] text-amber-700">MANUAL</span>}</td>
-                    <td className="text-xs text-gray-400">{fmtDate(v.fecha)}</td>
-                    <td className="text-xs">{v.cliente?.nombre || "—"}</td>
-                    <td className="text-xs">{v.cliente?.telefono || "—"}</td>
-                    <td className="text-right">{fmtCOP(v.total)}</td>
-                    <td className="text-right text-emerald-600">{fmtCOP(v.total - costo)}</td>
-                    <td className="text-xs uppercase text-gray-400">{v.tipo}</td>
-                    <td className="text-right" onClick={e => e.stopPropagation()}>
-                      <button title="Reimprimir" className="text-[var(--gold)] px-2" onClick={() => generarFacturaPDF(v, cfg)}><Printer className="w-4 h-4" /></button>
-                      <button title="Enviar por WhatsApp" className="text-emerald-600 px-2" onClick={() => sendWhatsapp(v)}><MessageCircle className="w-4 h-4" /></button>
-                      <button title="Cancelar" className="text-red-600 px-2" onClick={() => setPinModal(v)}><Trash2 className="w-4 h-4" /></button>
-                      <button title="Eliminar definitivo" className="text-red-800 px-2 text-xs font-black" onClick={() => borrarVentaDefinitivo(v)}>✕</button>
+                  const recovered = isVentaRecuperada(v);
+                  return <tr key={v.id} className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--mist)] cursor-pointer" onClick={() => setDetail(v)}>
+                    <td className="px-3 py-3 text-[var(--gold)] font-semibold whitespace-nowrap">{v.factura}{recovered && <span className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] text-amber-700">RECUP.</span>}{v.fechaManual && !recovered && <span className="ml-1 text-[9px] text-amber-700">MANUAL</span>}</td>
+                    <td className="px-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(v.fecha)}</td>
+                    <td className="px-3 text-xs min-w-[180px]">{v.cliente?.nombre || "—"}</td>
+                    <td className="px-3 text-xs whitespace-nowrap">{v.cliente?.telefono || "—"}</td>
+                    <td className="px-3 text-right whitespace-nowrap">{fmtCOP(v.total)}</td>
+                    <td className="px-3 text-right text-emerald-600 whitespace-nowrap">{fmtCOP(v.total - costo)}</td>
+                    <td className="px-3 text-xs uppercase text-gray-500 whitespace-nowrap">{v.tipo}</td>
+                    <td className="px-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      <button title="Reimprimir" className="text-[var(--gold)] p-2" onClick={() => generarFacturaPDF(v, cfg)}><Printer className="w-4 h-4" /></button>
+                      <button title="Enviar por WhatsApp" className="text-emerald-600 p-2" onClick={() => sendWhatsapp(v)}><MessageCircle className="w-4 h-4" /></button>
+                      {!recovered && <button title="Cancelar" className="text-red-600 p-2" onClick={() => setPinModal(v)}><Trash2 className="w-4 h-4" /></button>}
+                      {!recovered && <button title="Eliminar definitivo" className="text-red-800 p-2 text-xs font-black" onClick={() => borrarVentaDefinitivo(v)}>✕</button>}
                     </td>
                   </tr>;
                 })}
@@ -220,7 +225,7 @@ function Historial() {
 
 function Canceladas() {
   const [ventas, setVentas] = useVentas();
-  const cancel = ventas.filter(v => v.cancelada);
+  const cancel = ventas.filter(v => v.cancelada).sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
   const total = cancel.reduce((s, v) => s + v.total, 0);
   function borrarDefinitivo(v: Venta) {
     const pin = prompt("PIN para eliminar definitivamente:");
@@ -271,9 +276,9 @@ export function Gastos() {
   const [cat, setCat] = useState("Arriendo"); const [loc, setLoc] = useState<1 | 2>(1);
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
 
-  const [start, end] = rangeFor(periodo, from ? new Date(from).getTime() : undefined, to ? new Date(to).getTime() + 86400000 : undefined);
+  const [start, end] = rangeFor(periodo, dateInputToTime(from), dateInputToTime(to, true));
   const op = gastos.filter(g => g.tipo === "operativo");
-  const list = op.filter(g => g.fecha >= start && g.fecha <= end);
+  const list = op.filter(g => g.fecha >= start && g.fecha <= end).sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
 
   const totHoy = op.filter(g => g.fecha >= rangeFor("hoy")[0]).reduce((s, g) => s + g.monto, 0);
   const totMes = op.filter(g => g.fecha >= rangeFor("mes")[0]).reduce((s, g) => s + g.monto, 0);
@@ -322,8 +327,8 @@ export function Gastos() {
               {p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : p === "anio" ? "Este año" : "Todos"}
             </button>
           )}
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPeriodo("custom"); }} className="px-2 py-1 bg-white border border-[var(--line)] rounded-lg text-xs text-[var(--ink)]" />
+          <div className="min-w-[250px]"><DateTriple value={from} onChange={v => { setFrom(v); setPeriodo("custom"); }} /></div>
+          <div className="min-w-[250px]"><DateTriple value={to} onChange={v => { setTo(v); setPeriodo("custom"); }} /></div>
         </div>
         <table className="w-full text-sm">
           <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
