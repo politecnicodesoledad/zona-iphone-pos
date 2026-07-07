@@ -52,12 +52,16 @@ export function Ganancias() {
 
   // ventas por día
   const porDia = useMemo(() => {
-    const m = new Map<string, number>();
+    const m = new Map<string, { label: string; total: number; ts: number }>();
     data.vs.forEach(v => {
-      const k = fmtDate(v.fecha);
-      m.set(k, (m.get(k) || 0) + v.total);
+      const d = new Date(v.fecha);
+      d.setHours(0, 0, 0, 0);
+      const k = d.toISOString().slice(0, 10);
+      const cur = m.get(k) || { label: fmtDate(v.fecha), total: 0, ts: d.getTime() };
+      cur.total += v.total;
+      m.set(k, cur);
     });
-    return [...m.entries()].sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+    return [...m.values()].sort((a, b) => a.ts - b.ts).map((x) => [x.label, x.total] as [string, number]);
   }, [data.vs]);
   const maxDia = Math.max(1, ...porDia.map(([, v]) => v));
   const chartData = porDia.slice(-14).map(([fecha, ventas]) => ({ fecha, ventas }));

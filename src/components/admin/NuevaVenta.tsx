@@ -106,8 +106,13 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     const sinStock = items.find((it) => !it.esRapido && it.cantidad > (stockActual.find(p => p.id === it.productoId)?.stock || 0));
     if (sinStock) { alert(`Stock insuficiente para ${sinStock.nombre}`); return; }
     setSaving(true);
-    const { nextFacturaNumber } = await import("@/lib/zi/cloud-sync");
-    const facturaNum = await nextFacturaNumber(num);
+    let facturaNum = num;
+    try {
+      const { nextFacturaNumber } = await import("@/lib/zi/cloud-sync");
+      facturaNum = await nextFacturaNumber(num);
+    } catch {
+      facturaNum = num;
+    }
     const factura = fmtFactura(facturaNum);
     const venta: Venta = {
       id: uid(), factura, fecha: fechaVenta, registradaEn: Date.now(), fechaManual: retroMode, tipo: tipoPago, local, asesor,
