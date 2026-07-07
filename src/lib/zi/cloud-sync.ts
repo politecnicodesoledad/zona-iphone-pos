@@ -45,6 +45,7 @@ async function recordCloudDeletion(key: string, id: string, at = Date.now()) {
 }
 
 async function pushLocalTombstones(key: string) {
+  if (HISTORY_COLLECTIONS.has(key)) return;
   const tombstones = readLS<{ id: string; at: number }>(`deleted_${key}`);
   if (tombstones.length === 0) return;
   await Promise.all(tombstones.map((x) => recordCloudDeletion(key, x.id, x.at)));
@@ -142,6 +143,7 @@ async function readCloudDeletions() {
     });
   } catch { /* tabla opcional para instalaciones antiguas */ }
   [...COLLECTIONS.map((c) => c.key), ...RAW_COLLECTIONS].forEach((key) => {
+    if (HISTORY_COLLECTIONS.has(key)) return;
     const local = localDeletionSet(key);
     if (local.size === 0) return;
     if (!out.has(key)) out.set(key, new Set());
