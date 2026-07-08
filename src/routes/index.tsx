@@ -138,13 +138,31 @@ export function PublicIndex() {
               ))}
             </div>
           </div>
-          {/* visual */}
-          <div className="relative aspect-[4/5] max-w-md mx-auto w-full">
-            <div className="absolute inset-0 rounded-[2rem] border border-white/10 bg-white/[.04] shadow-2xl" />
-            <div className="absolute inset-5 flex items-center justify-center animate-float overflow-hidden rounded-[1.5rem] bg-white">
-              <img src={cfg.heroImageUrl || cfg.logoUrl} alt="Zona iPhone" className="h-full w-full object-contain p-8 drop-shadow-2xl" />
+          {/* visual — iPad-style frame */}
+          <div className="relative aspect-[3/4] max-w-md mx-auto w-full">
+            {/* Outer bezel */}
+            <div className="absolute inset-0 rounded-[2.5rem] bg-gradient-to-br from-gray-800 via-gray-900 to-black shadow-2xl p-3 md:p-4 border border-white/10">
+              {/* Camera dot */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-gray-700 ring-1 ring-white/10 z-10" />
+              {/* Screen */}
+              <div className="relative h-full w-full rounded-[1.75rem] overflow-hidden bg-white">
+                {cfg.heroMediaType === "video" && (cfg.heroMediaUrl || cfg.videoUrl) ? (
+                  <video
+                    key={cfg.heroMediaUrl || cfg.videoUrl}
+                    src={cfg.heroMediaUrl || cfg.videoUrl}
+                    autoPlay muted={muted} loop playsInline
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src={cfg.heroMediaUrl || cfg.heroImageUrl || cfg.logoUrl}
+                    alt="Zona iPhone"
+                    className="h-full w-full object-contain p-6 md:p-8 animate-float drop-shadow-2xl"
+                  />
+                )}
+              </div>
             </div>
-            <div className="absolute top-6 right-2 bg-white rounded-2xl shadow-soft border border-[var(--line)] p-3 animate-float" style={{ animationDelay: "1s" }}>
+            <div className="absolute top-6 -right-2 md:right-2 bg-white rounded-2xl shadow-soft border border-[var(--line)] p-3 animate-float" style={{ animationDelay: "1s" }}>
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-lg bg-[var(--cream)] flex items-center justify-center"><ShieldCheck className="w-4 h-4 text-[var(--gold-dark)]" /></div>
                 <div>
@@ -153,7 +171,7 @@ export function PublicIndex() {
                 </div>
               </div>
             </div>
-            <div className="absolute bottom-6 left-0 bg-white rounded-2xl shadow-soft border border-[var(--line)] p-3 animate-float" style={{ animationDelay: "2s" }}>
+            <div className="absolute bottom-6 -left-2 md:left-0 bg-white rounded-2xl shadow-soft border border-[var(--line)] p-3 animate-float" style={{ animationDelay: "2s" }}>
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-lg bg-[var(--cream)] flex items-center justify-center"><CreditCard className="w-4 h-4 text-[var(--gold-dark)]" /></div>
                 <div>
