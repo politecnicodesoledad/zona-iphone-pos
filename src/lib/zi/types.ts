@@ -176,6 +176,8 @@ export interface ZIConfig {
   // hero
   heroTagline: string;
   heroImageUrl: string;
+  heroMediaType?: "image" | "video";
+  heroMediaUrl?: string;
   // event
   eventActive: boolean;
   eventType: EventType;
