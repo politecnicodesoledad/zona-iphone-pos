@@ -17,6 +17,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [cfg] = useConfig();
 
   const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState<string>("todos");
   const [selectedId, setSelectedId] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [saving, setSaving] = useState(false);
@@ -49,10 +50,16 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [pinFecha, setPinFecha] = useState("");
 
   const disponibles = useMemo(() => [...productos, ...otros].filter(p => p.stock > 0), [productos, otros]);
+  const categoriasDisponibles = useMemo(() => {
+    const set = new Set(disponibles.map(p => p.categoria));
+    return Array.from(set);
+  }, [disponibles]);
   const matches = useMemo(() => {
-    const base = search ? disponibles.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase())) : disponibles;
-    return base.slice(0, search ? 30 : 50);
-  }, [disponibles, search]);
+    let base = disponibles;
+    if (catFilter !== "todos") base = base.filter(p => p.categoria === catFilter);
+    if (search) base = base.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()));
+    return base.slice(0, 100);
+  }, [disponibles, search, catFilter]);
   const total = items.reduce((s, i) => s + i.subtotal, 0);
   const descuentoTotal = items.reduce((s, i) => s + (i.descuento || 0), 0);
   const cValorCuota = cCuotas > 0 ? (total - cInicial) / cCuotas : 0;
