@@ -433,6 +433,17 @@ export function PublicIndex() {
       </footer>
 
       {quote && <QuoteModal data={quote} cfg={cfg} onClose={() => setQuote(null)} />}
+
+      {/* Floating WhatsApp button */}
+      <a
+        href={waLink("Hola! Quisiera más información.")}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Escríbenos por WhatsApp"
+        className="fixed bottom-5 right-5 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-[#25D366] shadow-2xl hover:scale-110 transition-transform ring-4 ring-[#25D366]/30 animate-float"
+      >
+        <MessageCircle className="w-7 h-7 text-white" />
+      </a>
     </div>
   );
 }
