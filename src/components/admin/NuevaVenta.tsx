@@ -230,21 +230,34 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     <div className="grid lg:grid-cols-[1fr_380px] gap-4">
       <div className="space-y-4">
         <Card>
-          <Field label="Buscar producto">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del producto..." className="pl-9" />
-            </div>
-          </Field>
+          <div className="grid md:grid-cols-2 gap-3">
+            <Field label="Categoría">
+              <Select value={catFilter} onChange={e => { setCatFilter(e.target.value); setSelectedId(""); }}>
+                <option value="todos">Todas las categorías</option>
+                {categoriasDisponibles.includes("iphone") && <option value="iphone">📱 iPhone</option>}
+                {categoriasDisponibles.includes("ipad") && <option value="ipad">📲 iPad</option>}
+                {categoriasDisponibles.includes("macbook") && <option value="macbook">💻 MacBook</option>}
+                {categoriasDisponibles.includes("accesorio") && <option value="accesorio">🎧 Accesorios</option>}
+                {categoriasDisponibles.includes("otro") && <option value="otro">📦 Otros</option>}
+              </Select>
+            </Field>
+            <Field label="Buscar producto">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del producto..." className="pl-9" />
+              </div>
+            </Field>
+          </div>
           <div className="mt-3 grid md:grid-cols-[1fr_auto] gap-2 items-end">
-            <Field label={search ? "Resultados filtrados" : "Desplegar inventario"}>
+            <Field label={`Producto (${matches.length} disponibles) — puedes agregar varios distintos`}>
               <Select value={selectedId} onChange={e => setSelectedId(e.target.value)}>
                 <option value="">Selecciona un producto...</option>
                 {matches.map(p => <option key={p.id} value={p.id}>{p.nombre} · {p.stock} disp. · {fmtCOP(p.precio)}</option>)}
               </Select>
             </Field>
-            <Btn type="button" variant="ink" onClick={addSelected} className="h-10">Agregar</Btn>
+            <Btn type="button" variant="ink" onClick={addSelected} className="h-10"><Plus className="w-4 h-4 inline" /> Agregar al carrito</Btn>
           </div>
+          <p className="text-[11px] text-gray-500 mt-2">💡 Puedes agregar varios productos distintos a la misma factura seleccionándolos uno por uno.</p>
         </Card>
 
         <Card>
