@@ -55,8 +55,36 @@ function Ajustes() {
           <Field label="Subtítulo"><Input value={draft.storeSubtitle} onChange={e => upd("storeSubtitle", e.target.value)} /></Field>
           <Field label="WhatsApp (sin +)"><Input value={draft.whatsapp} onChange={e => upd("whatsapp", e.target.value.replace(/\D/g,""))} /></Field>
           <Field label="Etiqueta del hero (antes era Apple Premium Reseller)"><Input value={draft.heroTagline} onChange={e => upd("heroTagline", e.target.value)} /></Field>
-          <Field label="Imagen del hero (URL — vacío usa el logo flotante)"><Input value={draft.heroImageUrl} onChange={e => upd("heroImageUrl", e.target.value)} placeholder="https://..." /></Field>
-          {draft.heroImageUrl && <img src={draft.heroImageUrl} alt="" className="max-h-32 mx-auto rounded-lg border border-[var(--line)] bg-[var(--mist)] p-2" />}
+          <div className="rounded-lg border border-[var(--line)] p-3 bg-[var(--mist)]/40 space-y-2">
+            <div className="text-xs uppercase tracking-widest text-gray-500 font-semibold">Medio del hero (iPad)</div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Tipo">
+                <Select value={draft.heroMediaType || "image"} onChange={e => upd("heroMediaType", e.target.value as "image" | "video")}>
+                  <option value="image">🖼 Imagen</option>
+                  <option value="video">🎬 Video</option>
+                </Select>
+              </Field>
+              <Field label="URL (imagen o video mp4)">
+                <Input value={draft.heroMediaUrl || ""} onChange={e => upd("heroMediaUrl", e.target.value)} placeholder="https://... o pega link" />
+              </Field>
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              <label className="text-xs px-3 py-2 border border-[var(--line)] rounded-lg cursor-pointer hover:bg-white">
+                📁 Subir desde galería
+                <input type="file" accept="image/*,video/*" className="hidden" onChange={e => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  const r = new FileReader();
+                  r.onload = () => upd("heroMediaUrl", String(r.result));
+                  r.readAsDataURL(f);
+                }} />
+              </label>
+              {draft.heroMediaUrl && <Btn variant="ghost" onClick={() => upd("heroMediaUrl", "")}>Quitar</Btn>}
+            </div>
+            {draft.heroMediaUrl && (draft.heroMediaType === "video"
+              ? <video src={draft.heroMediaUrl} muted autoPlay loop playsInline className="max-h-40 mx-auto rounded-lg border border-[var(--line)]" />
+              : <img src={draft.heroMediaUrl} alt="" className="max-h-40 mx-auto rounded-lg border border-[var(--line)] bg-white p-2" />
+            )}
+          </div>
           <Field label="Instagram URL"><Input value={draft.instagram} onChange={e => upd("instagram", e.target.value)} /></Field>
           <Field label="Facebook URL"><Input value={draft.facebook} onChange={e => upd("facebook", e.target.value)} /></Field>
           <Field label="Maps Link"><Input value={draft.mapsLink} onChange={e => upd("mapsLink", e.target.value)} /></Field>

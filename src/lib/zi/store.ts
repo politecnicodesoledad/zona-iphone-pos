@@ -45,6 +45,8 @@ export const DEFAULT_CONFIG: ZIConfig = {
   techWhatsapp: "https://wa.me/573233039179?text=Hola!%20Necesito%20servicio%20t%C3%A9cnico%20para%20mi%20iPhone",
   heroTagline: "Tienda Apple en Barranquilla",
   heroImageUrl: "",
+  heroMediaType: "image",
+  heroMediaUrl: "",
   eventActive: false,
   eventType: "christmas",
   eventEndDate: "",
