@@ -1,9 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useVentas, useGastos, useEmpleados, useProductos, useOtros, useVendidos } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, rangeFor, type Periodo, dateInputToTime } from "@/lib/zi/format";
 import { ventasConArchivados } from "@/lib/zi/sales-recovery";
 import { Card, Stat, Btn, DateTriple } from "./ui";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ziSupabase } from "@/integrations/supabase/zi-client";
+import type { Perfil } from "@/lib/zi/store";
 
 export function Ganancias() {
   const [ventas] = useVentas();
@@ -17,6 +19,23 @@ export function Ganancias() {
   const [to, setTo] = useState("");
   const [local, setLocal] = useState<"todos" | "1" | "2">("todos");
   const [verDesglose, setVer] = useState(false);
+
+  // Nombres ACTUALES de cada usuario, tomados en vivo de zi_perfiles — así el
+  // rendimiento por asesor queda conectado con la cuenta real de cada quien
+  // (si alguien corrige su nombre en Usuarios, aquí se refleja al instante),
+  // en vez de depender del texto que quedó guardado en la venta el día que
+  // se hizo (que puede quedar viejo o vacío).
+  const [perfiles, setPerfiles] = useState<Record<string, Perfil>>({});
+  useEffect(() => {
+    let alive = true;
+    ziSupabase.from("zi_perfiles").select("*").then(({ data }) => {
+      if (!alive) return;
+      const map: Record<string, Perfil> = {};
+      (data as Perfil[] ?? []).forEach(p => { map[p.id] = p; });
+      setPerfiles(map);
+    });
+    return () => { alive = false; };
+  }, []);
 
   const [start, end] = rangeFor(periodo, dateInputToTime(from), dateInputToTime(to, true));
   const ventasBase = useMemo(() => ventasConArchivados(ventas, vendidos), [ventas, vendidos]);
@@ -37,18 +56,32 @@ export function Ganancias() {
     return { vs, ingresos, costoVendido, operativos, inversionActiva, inversion, salarios, gananciaBruta, neta };
   }, [ventasBase, gastos, empleados, productos, otros, start, end, local]);
 
-  // por asesor
+  // Rendimiento por asesor — agrupado por asesorId (el vínculo REAL con la
+  // cuenta, el mismo que usa RLS y el módulo de Comisiones), no por el texto
+  // que se guardó en la venta. El nombre mostrado es el actual de zi_perfiles;
+  // si el asesor ya no existe, cae al nombre que quedó guardado en la venta.
+  // Las ventas sin asesorId (de antes del sistema de usuarios individuales,
+  // o importadas) se agrupan aparte para no mezclarlas con datos reales.
   const porAsesor = useMemo(() => {
-    const m = new Map<string, { ventas: number; total: number; ganancia: number }>();
+    const m = new Map<string, { nombre: string; ventas: number; total: number; ganancia: number }>();
+    let sinVincular = { ventas: 0, total: 0, ganancia: 0 };
     data.vs.forEach(v => {
-      const k = v.asesor || "Sin asesor";
-      const cur = m.get(k) || { ventas: 0, total: 0, ganancia: 0 };
-      cur.ventas++; cur.total += v.total;
-      cur.ganancia += v.total - v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0);
-      m.set(k, cur);
+      const ganancia = v.total - v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0);
+      if (!v.asesorId) {
+        sinVincular.ventas++; sinVincular.total += v.total; sinVincular.ganancia += ganancia;
+        return;
+      }
+      const perfil = perfiles[v.asesorId];
+      const nombre = perfil ? `${perfil.nombre} ${perfil.apellido || ""}`.trim() : (v.asesor || "Asesor eliminado");
+      const cur = m.get(v.asesorId) || { nombre, ventas: 0, total: 0, ganancia: 0 };
+      cur.nombre = nombre; // siempre el más reciente
+      cur.ventas++; cur.total += v.total; cur.ganancia += ganancia;
+      m.set(v.asesorId, cur);
     });
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [data.vs]);
+    const filas = [...m.entries()].map(([id, d]) => ({ id, ...d })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    if (sinVincular.ventas > 0) filas.push({ id: "sin-vincular", nombre: "Ventas antiguas (sin asesor vinculado)", ...sinVincular });
+    return filas;
+  }, [data.vs, perfiles]);
 
   // ventas por día
   const porDia = useMemo(() => {
@@ -166,8 +199,13 @@ export function Ganancias() {
                 <tr><th className="text-left py-1">Asesor</th><th className="text-right">Ventas</th><th className="text-right">Total</th><th className="text-right">Ganancia</th></tr>
               </thead>
               <tbody>
-                {porAsesor.map(([k, d]) => (
-                  <tr key={k} className="border-t border-[var(--line)]"><td className="py-1.5">{k}</td><td className="text-right">{d.ventas}</td><td className="text-right">{fmtCOP(d.total)}</td><td className="text-right text-[var(--gold)]">{fmtCOP(d.ganancia)}</td></tr>
+                {porAsesor.map(d => (
+                  <tr key={d.id} className={`border-t border-[var(--line)] ${d.id === "sin-vincular" ? "text-gray-400 italic" : ""}`}>
+                    <td className="py-1.5">{d.nombre}</td>
+                    <td className="text-right">{d.ventas}</td>
+                    <td className="text-right">{fmtCOP(d.total)}</td>
+                    <td className="text-right text-[var(--gold)]">{fmtCOP(d.ganancia)}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
