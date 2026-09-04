@@ -193,7 +193,8 @@ create policy "ventas_delete" on public.zi_ventas
 do $$
 declare t text;
 begin
-  -- Lectura para cualquier usuario activo; escritura solo ADMIN
+  -- Inventario/config: lectura pública, ALTA/BAJA solo ADMIN,
+  -- UPDATE permitido a cualquier usuario activo (descuento de stock al vender)
   for t in select unnest(array['zi_productos','zi_otros','zi_locales','zi_galeria','zi_config']) loop
     execute format('revoke all on public.%I from anon', t);
     execute format('grant select on public.%I to anon', t);   -- página pública (solo lectura)
@@ -203,18 +204,33 @@ begin
     execute format('drop policy if exists "%s_read" on public.%I', t, t);
     execute format('create policy "%s_read" on public.%I for select using (true)', t, t);
     execute format('drop policy if exists "%s_write" on public.%I', t, t);
-    execute format($p$create policy "%1$s_write" on public.%1$I for all to authenticated using (public.zi_es_admin()) with check (public.zi_es_admin())$p$, t);
+    execute format('drop policy if exists "%s_insert" on public.%I', t, t);
+    execute format('drop policy if exists "%s_update" on public.%I', t, t);
+    execute format('drop policy if exists "%s_delete" on public.%I', t, t);
+    execute format($p$create policy "%1$s_insert" on public.%1$I for insert to authenticated with check (public.zi_activo())$p$, t);
+    execute format($p$create policy "%1$s_update" on public.%1$I for update to authenticated using (public.zi_activo()) with check (public.zi_activo())$p$, t);
+    execute format($p$create policy "%1$s_delete" on public.%1$I for delete to authenticated using (public.zi_es_admin())$p$, t);
   end loop;
 
-  -- Datos sensibles: solo ADMIN (ni lectura para asesores ni para anónimos)
+  -- Datos sensibles: lectura solo ADMIN. El asesor puede escribir lo que
+  -- genera al vender (productos vendidos), pero nunca leer costos/gastos.
   for t in select unnest(array['zi_gastos','zi_empleados','zi_proveedores','zi_vendidos']) loop
     execute format('revoke all on public.%I from anon', t);
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "open_all" on public.%I', t);
     execute format('drop policy if exists "%s_admin" on public.%I', t, t);
-    execute format($p$create policy "%1$s_admin" on public.%1$I for all to authenticated using (public.zi_es_admin()) with check (public.zi_es_admin())$p$, t);
+    execute format('drop policy if exists "%s_select" on public.%I', t, t);
+    execute format('drop policy if exists "%s_write" on public.%I', t, t);
+    execute format($p$create policy "%1$s_select" on public.%1$I for select to authenticated using (public.zi_es_admin())$p$, t);
+    if t = 'zi_vendidos' then
+      execute format($p$create policy "%1$s_write" on public.%1$I for insert to authenticated with check (public.zi_activo())$p$, t);
+      execute format($p$create policy "%1$s_admin" on public.%1$I for update to authenticated using (public.zi_activo()) with check (public.zi_activo())$p$, t);
+    else
+      execute format($p$create policy "%1$s_admin" on public.%1$I for all to authenticated using (public.zi_es_admin()) with check (public.zi_es_admin())$p$, t);
+    end if;
   end loop;
+
 
   -- Clientes: asesor puede crear y ver clientes (necesario para vender)
   for t in select unnest(array['zi_clientes','zi_deletions','zi_counters']) loop
