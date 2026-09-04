@@ -214,6 +214,8 @@ function EditarNombreModal({ perfil, onClose, onDone }: { perfil: Perfil; onClos
     </div>
   );
 }
+
+function CambiarPinModal({ perfil, onClose, onDone }: { perfil: Perfil; onClose: () => void; onDone: () => void }) {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
