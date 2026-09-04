@@ -14,9 +14,16 @@ export function AdminLogin() {
     e.preventDefault();
     setBusy(true);
     setErr("");
-    const res = await login(email.trim(), pw);
-    setBusy(false);
-    if (!res.ok) setErr(res.error);
+    try {
+      const res = await login(email.trim(), pw);
+      if (!res.ok) setErr(res.error);
+    } catch (e2) {
+      // login() ya no debería lanzar excepciones, pero por si acaso: nunca
+      // dejamos el botón atascado en "Entrando...".
+      setErr("Ocurrió un error inesperado. Intenta de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
