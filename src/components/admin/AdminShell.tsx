@@ -44,7 +44,7 @@ export function AdminShell() {
     ...(isAdmin ? [{ id: "inventario" as Mod, icon: Package, label: "Inventario" }] : []),
     { id: "clientes", icon: Users, label: "Clientes" },
     ...(isAdmin ? [{ id: "usuarios" as Mod, icon: UserCog, label: "Usuarios" }] : []),
-    ...(isAdmin ? [{ id: "comisiones" as Mod, icon: Award, label: "Comisiones" }] : []),
+    ...(isAdmin ? [{ id: "comisiones" as Mod, icon: Award, label: "Reportes asesores" }] : []),
     ...(isAdmin ? [{ id: "config" as Mod, icon: Settings, label: "Configuración" }] : []),
   ];
 
@@ -58,7 +58,7 @@ export function AdminShell() {
     productos: "Catálogo de productos",
     clientes: "Clientes y empleados",
     usuarios: "Usuarios y asesores",
-    comisiones: "Comisiones de asesores",
+    comisiones: "Reportes de asesores",
     config: "Configuración",
   };
 
