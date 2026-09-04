@@ -95,7 +95,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     const set = new Set(disponibles.map(p => p.categoria));
     return Array.from(set);
   }, [disponibles]);
-  const recientes = useMemo(() => [...disponibles].sort((a, b) => (b.creadoEn || 0) - (a.creadoEn || 0)).slice(0, 6), [disponibles]);
   const matches = useMemo(() => {
     let base = disponibles;
     if (catFilter !== "todos") base = base.filter(p => p.categoria === catFilter);
@@ -314,18 +313,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
               </div>
             </Field>
           </div>
-
-          {!search && catFilter === "todos" && recientes.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="text-[10px] uppercase tracking-widest text-gray-400 self-center mr-1">Recientes:</span>
-              {recientes.map(p => (
-                <button key={p.id} type="button" onClick={() => add(p)}
-                        className="text-[11px] px-2.5 py-1 rounded-full border border-[var(--line)] hover:border-[var(--gold)] hover:bg-[var(--cream)] transition">
-                  {p.nombre}
-                </button>
-              ))}
-            </div>
-          )}
 
           <div className="mt-3 grid md:grid-cols-[1fr_auto] gap-2 items-end">
             <Field label={`Producto (${matches.length} disponibles)`}>
