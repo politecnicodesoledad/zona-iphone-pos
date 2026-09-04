@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { UserPlus, KeyRound, Power, X, Loader2 } from "lucide-react";
+import { UserPlus, KeyRound, Power, X, Loader2, Pencil } from "lucide-react";
 import { ziSupabase } from "@/integrations/supabase/zi-client";
 import type { Perfil } from "@/lib/zi/store";
 
@@ -23,6 +23,7 @@ export function Usuarios() {
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [pwTarget, setPwTarget] = useState<Perfil | null>(null);
+  const [editTarget, setEditTarget] = useState<Perfil | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +89,10 @@ export function Usuarios() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => setEditTarget(p)} title="Editar nombre (el que sale en la factura)"
+                              className="w-8 h-8 rounded-lg border border-[var(--line)] flex items-center justify-center hover:bg-[var(--mist)]">
+                        <Pencil className="w-4 h-4 text-gray-500" />
+                      </button>
                       {p.rol !== "admin" && (
                         <>
                           <button onClick={() => setPwTarget(p)} title="Cambiar PIN/contraseña"
@@ -114,6 +119,7 @@ export function Usuarios() {
 
       {showNew && <NuevoAsesorModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); load(); }} />}
       {pwTarget && <CambiarPinModal perfil={pwTarget} onClose={() => setPwTarget(null)} onDone={() => setPwTarget(null)} />}
+      {editTarget && <EditarNombreModal perfil={editTarget} onClose={() => setEditTarget(null)} onDone={() => { setEditTarget(null); load(); }} />}
     </div>
   );
 }
@@ -166,7 +172,48 @@ function NuevoAsesorModal({ onClose, onCreated }: { onClose: () => void; onCreat
   );
 }
 
-function CambiarPinModal({ perfil, onClose, onDone }: { perfil: Perfil; onClose: () => void; onDone: () => void }) {
+function EditarNombreModal({ perfil, onClose, onDone }: { perfil: Perfil; onClose: () => void; onDone: () => void }) {
+  const [nombre, setNombre] = useState(perfil.nombre);
+  const [apellido, setApellido] = useState(perfil.apellido || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr("");
+    try {
+      await callAdminUsers({ action: "update", userId: perfil.id, nombre, apellido });
+      onDone();
+    } catch (e2) {
+      setErr((e2 as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl relative">
+        <button onClick={onClose} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+        <h3 className="font-display text-lg text-[var(--ink)]">Editar nombre</h3>
+        <p className="text-xs text-gray-500 mt-1">Este es el nombre que aparece en la factura como "Atendido por".</p>
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <input required placeholder="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)}
+                   className="px-3 py-2.5 border border-[var(--line)] rounded-xl text-sm outline-none focus:border-[var(--gold)]" />
+            <input placeholder="Apellido" value={apellido} onChange={(e) => setApellido(e.target.value)}
+                   className="px-3 py-2.5 border border-[var(--line)] rounded-xl text-sm outline-none focus:border-[var(--gold)]" />
+          </div>
+          {err && <div className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</div>}
+          <button disabled={busy} className="zi-btn-gold w-full text-sm disabled:opacity-60">
+            {busy ? "Guardando..." : "Guardar nombre"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
