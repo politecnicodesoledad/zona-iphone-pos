@@ -3,6 +3,20 @@ import type {
   Producto, Venta, Gasto, ClienteCRM, Proveedor, Empleado,
   ProductoVendido, ZIConfig,
 } from "./types";
+import { ziSupabase } from "@/integrations/supabase/zi-client";
+import type { Session } from "@supabase/supabase-js";
+
+export type Perfil = {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  rol: "admin" | "asesor";
+  activo: boolean;
+  comision_pct: number;
+  creado_en: string;
+};
 
 const KEYS = {
   config: "zi_config",
@@ -206,28 +220,61 @@ export const Store = {
   setFacturaNum: (v: number) => { write(KEYS.facturaNum, v); queueCloudSync(KEYS.facturaNum, v); emit(); },
 };
 
-// Session
+// Session — autenticación real con Supabase Auth + rol desde zi_perfiles.
+// Ya no existe un usuario/contraseña compartido: cada quien entra con su cuenta.
 export function useSession() {
-  const [authed, setAuthed] = useState(() =>
-    typeof sessionStorage !== "undefined" && sessionStorage.getItem("zi_session") === "1");
-  useEffect(() => {
-    const handler = () => setAuthed(sessionStorage.getItem("zi_session") === "1");
-    window.addEventListener("zi-session", handler);
-    return () => window.removeEventListener("zi-session", handler);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Perfil | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadProfile = useCallback(async (userId: string) => {
+    const { data } = await ziSupabase.from("zi_perfiles").select("*").eq("id", userId).maybeSingle();
+    setProfile((data as Perfil) ?? null);
   }, []);
-  const login = (pw: string) => {
-    if (pw === Store.config().adminPassword) {
-      sessionStorage.setItem("zi_session", "1");
-      window.dispatchEvent(new Event("zi-session"));
-      return true;
+
+  useEffect(() => {
+    ziSupabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session) loadProfile(data.session.user.id);
+      setLoading(false);
+    });
+    const { data: sub } = ziSupabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+      if (sess) loadProfile(sess.user.id);
+      else setProfile(null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [loadProfile]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const { data, error } = await ziSupabase.auth.signInWithPassword({ email, password });
+    if (error || !data.session) return { ok: false as const, error: "Correo o contraseña incorrectos" };
+    const { data: perfil } = await ziSupabase
+      .from("zi_perfiles")
+      .select("*")
+      .eq("id", data.session.user.id)
+      .maybeSingle();
+    if (!perfil || !perfil.activo) {
+      await ziSupabase.auth.signOut();
+      return { ok: false as const, error: "Usuario inactivo. Contacta al administrador." };
     }
-    return false;
+    setProfile(perfil as Perfil);
+    return { ok: true as const };
+  }, []);
+
+  const logout = useCallback(async () => {
+    await ziSupabase.auth.signOut();
+    setProfile(null);
+  }, []);
+
+  return {
+    authed: !!session && !!profile,
+    loading,
+    profile,
+    isAdmin: profile?.rol === "admin",
+    login,
+    logout,
   };
-  const logout = () => {
-    sessionStorage.removeItem("zi_session");
-    window.dispatchEvent(new Event("zi-session"));
-  };
-  return { authed, login, logout };
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
