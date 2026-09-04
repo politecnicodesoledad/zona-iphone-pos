@@ -63,7 +63,12 @@ async function upsertRows(key: string, items: any[]) {
   const rows = items.filter((it) => it?.id).map((it) => ({
     id: it.id,
     data: it,
-    ...(key === "ventas" ? { fecha: new Date((it as Venta).fecha).toISOString() } : {}),
+    ...(key === "ventas" ? {
+      fecha: new Date((it as Venta).fecha).toISOString(),
+      // RLS valida esta columna real, no lo que va dentro de "data" — por eso
+      // hay que replicarla aquí explícitamente.
+      asesor_id: (it as Venta).asesorId || null,
+    } : {}),
     updated_at: new Date().toISOString(),
   }));
   const result = rows.length ? await ziSupabase.from(`zi_${key}`).upsert(rows) : ({ error: null } as any);
