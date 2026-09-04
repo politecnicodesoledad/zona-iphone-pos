@@ -11,8 +11,9 @@ import { Configuracion } from "./Configuracion";
 import { Usuarios } from "./Usuarios";
 import { Comisiones } from "./Comisiones";
 import { MiDesempeno } from "./MiDesempeno";
+import { ProductosAsesor } from "./ProductosAsesor";
 
-type Mod = "ganancias" | "mirendimiento" | "venta" | "movimientos" | "gastos" | "inventario" | "clientes" | "usuarios" | "comisiones" | "config";
+type Mod = "ganancias" | "mirendimiento" | "venta" | "movimientos" | "gastos" | "inventario" | "productos" | "clientes" | "usuarios" | "comisiones" | "config";
 
 export function AdminShell() {
   const { logout, profile, isAdmin } = useSession();
@@ -37,6 +38,7 @@ export function AdminShell() {
     ...(isAdmin ? [{ id: "ganancias" as Mod, icon: BarChart3, label: "Ganancias" }] : []),
     ...(!isAdmin ? [{ id: "mirendimiento" as Mod, icon: Award, label: "Mi rendimiento" }] : []),
     { id: "venta", icon: ShoppingBag, label: "Nueva venta", badge: fmtFactura(num) },
+    ...(!isAdmin ? [{ id: "productos" as Mod, icon: Package, label: "Productos" }] : []),
     { id: "movimientos", icon: Wallet, label: "Movimientos" },
     ...(isAdmin ? [{ id: "gastos" as Mod, icon: ReceiptText, label: "Gastos" }] : []),
     ...(isAdmin ? [{ id: "inventario" as Mod, icon: Package, label: "Inventario" }] : []),
@@ -53,6 +55,7 @@ export function AdminShell() {
     movimientos: "Movimientos e historial",
     gastos: "Gastos operativos",
     inventario: "Inventario",
+    productos: "Catálogo de productos",
     clientes: "Clientes y empleados",
     usuarios: "Usuarios y asesores",
     comisiones: "Comisiones de asesores",
@@ -131,6 +134,7 @@ export function AdminShell() {
             {mod === "movimientos" && <Finanzas />}
             {mod === "gastos" && isAdmin && <Gastos />}
             {mod === "inventario" && isAdmin && <Inventario />}
+            {mod === "productos" && !isAdmin && <ProductosAsesor />}
             {mod === "clientes" && <ClientesEmpleados />}
             {mod === "usuarios" && isAdmin && <Usuarios />}
             {mod === "comisiones" && isAdmin && <Comisiones />}
