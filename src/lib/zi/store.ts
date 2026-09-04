@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
+import { useEffect, useCallback, useSyncExternalStore } from "react";
 import type {
   Producto, Venta, Gasto, ClienteCRM, Proveedor, Empleado,
   ProductoVendido, ZIConfig,
@@ -222,29 +222,62 @@ export const Store = {
 
 // Session — autenticación real con Supabase Auth + rol desde zi_perfiles.
 // Ya no existe un usuario/contraseña compartido: cada quien entra con su cuenta.
+//
+// IMPORTANTE: este estado es un SINGLETON a nivel de módulo, no un useState
+// normal dentro del hook. Antes, cada componente que llamaba useSession()
+// (AdminPage, AdminShell, NuevaVenta, Finanzas, MiDesempeno, AdminLogin...)
+// arrancaba su PROPIA copia de session/profile/loading y hacía su PROPIA
+// llamada a getSession()/zi_perfiles por separado. Como esas llamadas no
+// terminan exactamente al mismo tiempo, un componente podía quedar un
+// instante con profile=null mientras otro ya lo tenía cargado: eso es lo que
+// causaba el parpadeo a "Mi rendimiento" (porque en ese instante isAdmin
+// salía false) y el rebote al login (porque en ese instante authed salía
+// false). Con un solo estado compartido, todos los componentes se actualizan
+// exactamente al mismo tiempo, con el mismo valor — el parpadeo desaparece.
+let ziSessionState = {
+  session: null as Session | null,
+  profile: null as Perfil | null,
+  loading: true,
+};
+const sessionListeners = new Set<() => void>();
+function emitSession() { sessionListeners.forEach((l) => l()); }
+function setSessionState(patch: Partial<typeof ziSessionState>) {
+  ziSessionState = { ...ziSessionState, ...patch };
+  emitSession();
+}
+
+let sessionInitStarted = false;
+let profileFetchToken = 0; // evita que una respuesta vieja pise una más nueva
+
+async function loadProfileSingleton(userId: string) {
+  const myToken = ++profileFetchToken;
+  const { data } = await ziSupabase.from("zi_perfiles").select("*").eq("id", userId).maybeSingle();
+  if (myToken !== profileFetchToken) return; // llegó una petición más nueva después: ignorar esta
+  setSessionState({ profile: (data as Perfil) ?? null });
+}
+
+function initSessionOnce() {
+  if (sessionInitStarted) return;
+  sessionInitStarted = true;
+  ziSupabase.auth.getSession().then(({ data }) => {
+    setSessionState({ session: data.session, loading: false });
+    if (data.session) loadProfileSingleton(data.session.user.id);
+  });
+  ziSupabase.auth.onAuthStateChange((_event, sess) => {
+    setSessionState({ session: sess, loading: false });
+    if (sess) loadProfileSingleton(sess.user.id);
+    else { profileFetchToken++; setSessionState({ profile: null }); }
+  });
+}
+
 export function useSession() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Perfil | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const loadProfile = useCallback(async (userId: string) => {
-    const { data } = await ziSupabase.from("zi_perfiles").select("*").eq("id", userId).maybeSingle();
-    setProfile((data as Perfil) ?? null);
+  const subscribe = useCallback((cb: () => void) => {
+    initSessionOnce();
+    sessionListeners.add(cb);
+    return () => { sessionListeners.delete(cb); };
   }, []);
-
-  useEffect(() => {
-    ziSupabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session) loadProfile(data.session.user.id);
-      setLoading(false);
-    });
-    const { data: sub } = ziSupabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-      if (sess) loadProfile(sess.user.id);
-      else setProfile(null);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, [loadProfile]);
+  const getSnapshot = useCallback(() => ziSessionState, []);
+  const state = useSyncExternalStore(subscribe, getSnapshot, () => ziSessionState);
 
   const login = useCallback(async (email: string, password: string) => {
     const { data, error } = await ziSupabase.auth.signInWithPassword({ email, password });
@@ -254,24 +287,26 @@ export function useSession() {
       .select("*")
       .eq("id", data.session.user.id)
       .maybeSingle();
-    if (!perfil || !perfil.activo) {
+    if (!perfil || !(perfil as Perfil).activo) {
       await ziSupabase.auth.signOut();
       return { ok: false as const, error: "Usuario inactivo. Contacta al administrador." };
     }
-    setProfile(perfil as Perfil);
+    profileFetchToken++; // cualquier fetch de perfil en vuelo queda invalidado
+    setSessionState({ session: data.session, profile: perfil as Perfil, loading: false });
     return { ok: true as const };
   }, []);
 
   const logout = useCallback(async () => {
     await ziSupabase.auth.signOut();
-    setProfile(null);
+    profileFetchToken++;
+    setSessionState({ session: null, profile: null });
   }, []);
 
   return {
-    authed: !!session && !!profile,
-    loading,
-    profile,
-    isAdmin: profile?.rol === "admin",
+    authed: !!state.session && !!state.profile,
+    loading: state.loading,
+    profile: state.profile,
+    isAdmin: state.profile?.rol === "admin",
     login,
     logout,
   };
