@@ -249,11 +249,17 @@ function setSessionState(patch: Partial<typeof ziSessionState>) {
 let sessionInitStarted = false;
 let profileFetchToken = 0; // evita que una respuesta vieja pise una más nueva
 
+async function fetchPerfil(userId: string): Promise<Perfil | null> {
+  const { data, error } = await ziSupabase.from("zi_perfiles").select("*").eq("id", userId).maybeSingle();
+  if (error) { console.error("zi_perfiles:", error.message); return null; }
+  return (data as Perfil) ?? null;
+}
+
 async function loadProfileSingleton(userId: string) {
   const myToken = ++profileFetchToken;
-  const { data } = await ziSupabase.from("zi_perfiles").select("*").eq("id", userId).maybeSingle();
+  const perfil = await fetchPerfil(userId);
   if (myToken !== profileFetchToken) return; // llegó una petición más nueva después: ignorar esta
-  setSessionState({ profile: (data as Perfil) ?? null });
+  setSessionState({ profile: perfil });
 }
 
 function initSessionOnce() {
@@ -282,17 +288,38 @@ export function useSession() {
   const login = useCallback(async (email: string, password: string) => {
     const { data, error } = await ziSupabase.auth.signInWithPassword({ email, password });
     if (error || !data.session) return { ok: false as const, error: "Correo o contraseña incorrectos" };
-    const { data: perfil } = await ziSupabase
-      .from("zi_perfiles")
-      .select("*")
-      .eq("id", data.session.user.id)
-      .maybeSingle();
-    if (!perfil || !(perfil as Perfil).activo) {
+
+    profileFetchToken++; // invalida cualquier fetch de perfil que ya estuviera en vuelo
+    const myToken = profileFetchToken;
+
+    // Justo después de signInWithPassword, la sesión nueva a veces tarda un
+    // instante en quedar disponible para las consultas a Postgrest. Si la
+    // primera lectura de zi_perfiles viene vacía, NO asumimos "inactivo":
+    // reintentamos una vez antes de sacar cualquier conclusión. Antes, ese
+    // vacío transitorio se interpretaba como "usuario inactivo" y te cerraba
+    // la sesión a ti mismo siendo admin activo.
+    let perfil = await fetchPerfil(data.session.user.id);
+    if (!perfil) {
+      await new Promise((r) => setTimeout(r, 500));
+      perfil = await fetchPerfil(data.session.user.id);
+    }
+
+    if (myToken !== profileFetchToken) return { ok: true as const }; // otra sesión más nueva ya tomó el control
+
+    if (!perfil) {
+      // No se pudo confirmar el perfil tras dos intentos: puede ser un
+      // problema de red o de RLS, pero NO sabemos que esté inactivo, así que
+      // no cerramos la sesión ni acusamos al usuario de estar desactivado.
+      setSessionState({ session: data.session, loading: false });
+      return { ok: false as const, error: "No se pudo verificar tu perfil. Intenta iniciar sesión de nuevo en unos segundos." };
+    }
+
+    if (!perfil.activo) {
       await ziSupabase.auth.signOut();
       return { ok: false as const, error: "Usuario inactivo. Contacta al administrador." };
     }
-    profileFetchToken++; // cualquier fetch de perfil en vuelo queda invalidado
-    setSessionState({ session: data.session, profile: perfil as Perfil, loading: false });
+
+    setSessionState({ session: data.session, profile: perfil, loading: false });
     return { ok: true as const };
   }, []);
 
