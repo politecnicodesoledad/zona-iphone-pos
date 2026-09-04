@@ -249,10 +249,31 @@ function setSessionState(patch: Partial<typeof ziSessionState>) {
 let sessionInitStarted = false;
 let profileFetchToken = 0; // evita que una respuesta vieja pise una más nueva
 
+// Corta cualquier promesa que se quede colgada más de `ms` — en vez de dejar
+// la UI esperando para siempre (lo que pasaba en el MacBook: el botón se
+// quedaba en "Entrando..." sin fin si alguna llamada de red nunca resolvía).
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Tiempo de espera agotado: ${label}`)), ms);
+    Promise.resolve(promise).then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
 async function fetchPerfil(userId: string): Promise<Perfil | null> {
-  const { data, error } = await ziSupabase.from("zi_perfiles").select("*").eq("id", userId).maybeSingle();
-  if (error) { console.error("zi_perfiles:", error.message); return null; }
-  return (data as Perfil) ?? null;
+  try {
+    const { data, error } = await withTimeout(
+      ziSupabase.from("zi_perfiles").select("*").eq("id", userId).maybeSingle(),
+      12000, "carga de perfil"
+    );
+    if (error) { console.error("zi_perfiles:", error.message); return null; }
+    return (data as Perfil) ?? null;
+  } catch (e) {
+    // Puede fallar por red, por bloqueo del navegador (p. ej. Safari/macOS con
+    // rastreo estricto), o por quedarse colgada: nunca dejamos que esto
+    // reviente hacia arriba. login() siempre debe poder terminar.
+    console.error("zi_perfiles (excepción):", e);
+    return null;
+  }
 }
 
 async function loadProfileSingleton(userId: string) {
@@ -286,41 +307,51 @@ export function useSession() {
   const state = useSyncExternalStore(subscribe, getSnapshot, () => ziSessionState);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { data, error } = await ziSupabase.auth.signInWithPassword({ email, password });
-    if (error || !data.session) return { ok: false as const, error: "Correo o contraseña incorrectos" };
+    try {
+      const { data, error } = await withTimeout(
+        ziSupabase.auth.signInWithPassword({ email, password }),
+        15000, "inicio de sesión"
+      );
+      if (error || !data.session) return { ok: false as const, error: "Correo o contraseña incorrectos" };
 
-    profileFetchToken++; // invalida cualquier fetch de perfil que ya estuviera en vuelo
-    const myToken = profileFetchToken;
+      profileFetchToken++; // invalida cualquier fetch de perfil que ya estuviera en vuelo
+      const myToken = profileFetchToken;
 
-    // Justo después de signInWithPassword, la sesión nueva a veces tarda un
-    // instante en quedar disponible para las consultas a Postgrest. Si la
-    // primera lectura de zi_perfiles viene vacía, NO asumimos "inactivo":
-    // reintentamos una vez antes de sacar cualquier conclusión. Antes, ese
-    // vacío transitorio se interpretaba como "usuario inactivo" y te cerraba
-    // la sesión a ti mismo siendo admin activo.
-    let perfil = await fetchPerfil(data.session.user.id);
-    if (!perfil) {
-      await new Promise((r) => setTimeout(r, 500));
-      perfil = await fetchPerfil(data.session.user.id);
+      // Justo después de signInWithPassword, la sesión nueva a veces tarda un
+      // instante en quedar disponible para las consultas a Postgrest. Si la
+      // primera lectura de zi_perfiles viene vacía, NO asumimos "inactivo":
+      // reintentamos una vez antes de sacar cualquier conclusión. Antes, ese
+      // vacío transitorio se interpretaba como "usuario inactivo" y te cerraba
+      // la sesión a ti mismo siendo admin activo.
+      let perfil = await fetchPerfil(data.session.user.id);
+      if (!perfil) {
+        await new Promise((r) => setTimeout(r, 500));
+        perfil = await fetchPerfil(data.session.user.id);
+      }
+
+      if (myToken !== profileFetchToken) return { ok: true as const }; // otra sesión más nueva ya tomó el control
+
+      if (!perfil) {
+        // No se pudo confirmar el perfil tras dos intentos: puede ser un
+        // problema de red o de RLS, pero NO sabemos que esté inactivo, así que
+        // no cerramos la sesión ni acusamos al usuario de estar desactivado.
+        setSessionState({ session: data.session, loading: false });
+        return { ok: false as const, error: "No se pudo verificar tu perfil. Intenta iniciar sesión de nuevo en unos segundos." };
+      }
+
+      if (!perfil.activo) {
+        await ziSupabase.auth.signOut();
+        return { ok: false as const, error: "Usuario inactivo. Contacta al administrador." };
+      }
+
+      setSessionState({ session: data.session, profile: perfil, loading: false });
+      return { ok: true as const };
+    } catch (e) {
+      // Red de la persona a la que le está pasando esto o el navegador
+      // bloqueó/cortó alguna petición: nunca dejamos el login "colgado".
+      console.error("login():", e);
+      return { ok: false as const, error: "No se pudo conectar. Revisa tu internet e intenta de nuevo." };
     }
-
-    if (myToken !== profileFetchToken) return { ok: true as const }; // otra sesión más nueva ya tomó el control
-
-    if (!perfil) {
-      // No se pudo confirmar el perfil tras dos intentos: puede ser un
-      // problema de red o de RLS, pero NO sabemos que esté inactivo, así que
-      // no cerramos la sesión ni acusamos al usuario de estar desactivado.
-      setSessionState({ session: data.session, loading: false });
-      return { ok: false as const, error: "No se pudo verificar tu perfil. Intenta iniciar sesión de nuevo en unos segundos." };
-    }
-
-    if (!perfil.activo) {
-      await ziSupabase.auth.signOut();
-      return { ok: false as const, error: "Usuario inactivo. Contacta al administrador." };
-    }
-
-    setSessionState({ session: data.session, profile: perfil, loading: false });
-    return { ok: true as const };
   }, []);
 
   const logout = useCallback(async () => {
