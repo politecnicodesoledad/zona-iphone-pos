@@ -152,6 +152,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     if (saving) return;
     if (items.length === 0) { alert("Agrega al menos un producto"); return; }
     if (!profile) { alert("No se detectó tu sesión. Vuelve a iniciar sesión."); return; }
+    if (!cNombre.trim()) { alert("El nombre del cliente es obligatorio."); return; }
     const requiereCliente = tipoPago === "credito" || tipoPago === "tradein";
     if (requiereCliente && (!cNombre.trim() || !cTel.trim() || !cCedula.trim())) {
       alert("Para crédito o celular como parte de pago debes registrar nombre, teléfono y cédula del cliente."); return;
@@ -175,7 +176,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
       ? new Date(new Date(fechaVenta).setMonth(new Date(fechaVenta).getMonth() + garantiaMeses)).getTime()
       : undefined;
     const nombreAsesor = `${profile.nombre} ${profile.apellido}`.trim();
-    const tieneDatosCliente = cNombre || (showCelular && cTel) || (showCedula && cCedula) || (showDireccion && cDireccion);
     const venta: Venta = {
       id: uid(), factura, fecha: fechaVenta, registradaEn: Date.now(), fechaManual: retroMode,
       tipo: tipoPago, local,
@@ -185,14 +185,12 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
       observaciones: obs, garantia: cfg.facturaGarantia,
       garantiaMeses: garantiaMeses || undefined, garantiaVencimiento,
       ...(showImei && imei.trim() && { imei: imei.trim() }),
-      ...(tieneDatosCliente && {
-        cliente: {
-          nombre: cNombre.trim(),
-          ...(showCedula && { cedula: cCedula.trim() }),
-          ...(showCelular && { telefono: cTel.trim() }),
-          ...(showDireccion && { direccion: cDireccion.trim() }),
-        },
-      }),
+      cliente: {
+        nombre: cNombre.trim(),
+        ...(showCedula && { cedula: cCedula.trim() }),
+        ...(showCelular && { telefono: cTel.trim() }),
+        ...(showDireccion && { direccion: cDireccion.trim() }),
+      },
       ...(tipoPago === "contado" && { metodoPago: metodo, recibido }),
       ...(tipoPago === "credito" && {
         cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel, ...(showDireccion && { direccion: cDireccion }) },
@@ -378,8 +376,11 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
           )}
         </Section>
 
-        <Section title="2. Datos adicionales" subtitle="Selecciona solo lo que necesites para esta venta" defaultOpen={false}>
-          <div className="flex flex-wrap gap-2">
+        <Section title="2. Cliente" subtitle="El nombre es obligatorio para toda venta">
+          <Field label="Nombre del cliente (obligatorio)">
+            <Input value={cNombre} onChange={e => setCNombre(e.target.value)} placeholder="Nombre de quien compra" required />
+          </Field>
+          <div className="flex flex-wrap gap-2 mt-3">
             <Checkbox label="IMEI" checked={showImei} onChange={setShowImei} />
             <Checkbox label="Cédula" checked={showCedula} onChange={setShowCedula} />
             <Checkbox label="Número de celular" checked={showCelular} onChange={setShowCelular} />
@@ -387,7 +388,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
           </div>
           {(showImei || showCedula || showCelular || showDireccion) && (
             <div className="grid md:grid-cols-2 gap-3 mt-3">
-              <Field label="Nombre del cliente"><Input value={cNombre} onChange={e => setCNombre(e.target.value)} placeholder="Nombre del cliente" /></Field>
               {showImei && <Field label="IMEI del producto"><Input value={imei} onChange={e => setImei(e.target.value)} placeholder="Ej: 353454545454545" /></Field>}
               {showCedula && <Field label="Cédula del cliente"><Input value={cCedula} onChange={e => setCCedula(e.target.value.replace(/\D/g, ""))} placeholder="1.234.567.890" /></Field>}
               {showCelular && <Field label="Número de celular"><Input value={cTel} onChange={e => setCTel(e.target.value.replace(/\D/g, ""))} placeholder="300 123 4567" /></Field>}
