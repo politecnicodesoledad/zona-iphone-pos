@@ -1,9 +1,10 @@
 import { useMemo, useEffect, useState } from "react";
-import { useVentas, useSession } from "@/lib/zi/store";
+import { useVentas, useSession, useGastos, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate } from "@/lib/zi/format";
 import { ziSupabase } from "@/integrations/supabase/zi-client";
-import { Card } from "./ui";
-import { TrendingUp, Calendar, Award, ShieldCheck } from "lucide-react";
+import { Card, Field, Input, Select, Btn } from "./ui";
+import { TrendingUp, Calendar, Award, ShieldCheck, ReceiptText } from "lucide-react";
+import type { Gasto } from "@/lib/zi/types";
 
 function mesActualISO() {
   const d = new Date();
@@ -95,6 +96,43 @@ export function MiDesempeno() {
           </div>
         )}
       </Card>
+
+      <RegistrarGasto />
     </div>
+  );
+}
+
+function RegistrarGasto() {
+  const [, setGastos] = useGastos();
+  const [desc, setDesc] = useState("");
+  const [monto, setMonto] = useState(0);
+  const [cat, setCat] = useState("Transporte");
+  const [ok, setOk] = useState(false);
+
+  function add() {
+    if (!desc.trim() || !monto) { alert("Escribe una descripción y el monto del gasto."); return; }
+    const g: Gasto = { id: uid(), descripcion: desc.trim(), monto, categoria: cat, local: 1, fecha: Date.now(), tipo: "operativo" };
+    setGastos(prev => [...prev, g]);
+    setDesc(""); setMonto(0);
+    setOk(true);
+    setTimeout(() => setOk(false), 2500);
+  }
+
+  return (
+    <Card>
+      <h3 className="font-display text-lg text-[var(--ink)] flex items-center gap-2"><ReceiptText className="w-4 h-4 text-[var(--gold-dark)]" /> Registrar un gasto</h3>
+      <p className="text-xs text-gray-500 mt-0.5 mb-3">Para gastos necesarios del día a día (transporte, suministros, etc.) — se descuentan del negocio, el admin los revisa en Gastos.</p>
+      <div className="grid md:grid-cols-4 gap-2 items-end">
+        <Field label="Descripción"><Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej: Domicilio del producto" /></Field>
+        <Field label="Monto"><Input type="number" value={monto} onChange={e => setMonto(+e.target.value || 0)} /></Field>
+        <Field label="Categoría">
+          <Select value={cat} onChange={e => setCat(e.target.value)}>
+            <option>Transporte</option><option>Suministros</option><option>Servicios</option><option>Publicidad</option><option>Otro</option>
+          </Select>
+        </Field>
+        <Btn variant="ink" onClick={add}>+ Registrar</Btn>
+      </div>
+      {ok && <div className="text-emerald-600 text-xs mt-2">Gasto registrado ✓</div>}
+    </Card>
   );
 }
