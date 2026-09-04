@@ -96,7 +96,7 @@ export function Comisiones() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl text-[var(--ink)]">Comisiones de asesores</h2>
+          <h2 className="font-display text-xl text-[var(--ink)]">Reportes de asesores</h2>
           <p className="text-sm text-gray-500">Comisión = % configurado × ganancia neta generada por el asesor (nunca sobre ventas totales).</p>
         </div>
         <Field label="Mes"><input type="month" value={periodo} onChange={e => setPeriodo(e.target.value)}
