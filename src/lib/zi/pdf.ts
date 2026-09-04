@@ -148,7 +148,7 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   doc.text(garantia, 4, y); y += garantia.length * 3.5;
 
   y += 2; dash();
-  if (venta.asesor) center(venta.asesor, 6);
+  if (venta.asesor) center(`Atendido por: ${venta.asesor}`, 6);
   dash();
   doc.setFontSize(11); doc.setFont("courier", "bold"); doc.setTextColor(10, 10, 10);
   doc.text("¡Gracias por su compra!", w / 2, y, { align: "center" }); y += 6;
