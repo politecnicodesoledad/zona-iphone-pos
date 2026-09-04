@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BarChart3, ShoppingBag, Wallet, Package, Users, Settings, LogOut, Menu, ReceiptText } from "lucide-react";
+import { BarChart3, ShoppingBag, Wallet, Package, Users, UserCog, Settings, LogOut, Menu, ReceiptText } from "lucide-react";
 import { useSession, useConfig, useFacturaNum } from "@/lib/zi/store";
 import { fmtFactura } from "@/lib/zi/store";
 import { Ganancias } from "./Ganancias";
@@ -7,9 +7,10 @@ import { NuevaVenta } from "./NuevaVenta";
 import { Finanzas, Gastos } from "./Finanzas";
 import { Inventario } from "./Inventario";
 import { ClientesEmpleados } from "./ClientesEmpleados";
+import { Usuarios } from "./Usuarios";
 import { Configuracion } from "./Configuracion";
 
-type Mod = "ganancias" | "venta" | "movimientos" | "gastos" | "inventario" | "clientes" | "config";
+type Mod = "ganancias" | "venta" | "movimientos" | "gastos" | "inventario" | "clientes" | "usuarios" | "config";
 
 export function AdminShell() {
   const { logout } = useSession();
@@ -34,6 +35,7 @@ export function AdminShell() {
     { id: "gastos", icon: ReceiptText, label: "Gastos" },
     { id: "inventario", icon: Package, label: "Inventario" },
     { id: "clientes", icon: Users, label: "Clientes" },
+    { id: "usuarios", icon: UserCog, label: "Usuarios" },
     { id: "config", icon: Settings, label: "Configuración" },
   ];
 
@@ -44,6 +46,7 @@ export function AdminShell() {
     gastos: "Gastos operativos",
     inventario: "Inventario",
     clientes: "Clientes y empleados",
+    usuarios: "Usuarios y asesores",
     config: "Configuración",
   };
 
@@ -113,6 +116,7 @@ export function AdminShell() {
             {mod === "gastos" && <Gastos />}
             {mod === "inventario" && <Inventario />}
             {mod === "clientes" && <ClientesEmpleados />}
+            {mod === "usuarios" && <Usuarios />}
             {mod === "config" && <Configuracion />}
           </div>
         </main>
