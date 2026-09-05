@@ -49,8 +49,8 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   const rawLogo = cfg.logoUrl ? await loadImageAsDataURL(cfg.logoUrl) : undefined;
   const logoData = rawLogo ? await toBlackWhite(rawLogo) : undefined;
   const estimatedProductLines = venta.productos.reduce((sum, producto) => sum + Math.max(1, Math.ceil(producto.nombre.length / 25)), 0);
-  const estimatedHeight = 174 + estimatedProductLines * 4 + (venta.observaciones ? 12 : 0) + (venta.tipo === "credito" ? 10 : 0) + (venta.tipo === "tradein" ? 14 : 0);
-  const receiptHeight = Math.max(210, Math.min(340, estimatedHeight));
+  const estimatedHeight = 135 + estimatedProductLines * 4 + (venta.observaciones ? 10 : 0) + (venta.tipo === "credito" ? 9 : 0) + (venta.tipo === "tradein" ? 13 : 0);
+  const receiptHeight = Math.max(165, Math.min(320, estimatedHeight));
   const doc = new jsPDF({ unit: "mm", format: [80, receiptHeight] });
   const w = 80;
   const left = 5;
@@ -134,7 +134,11 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   if (venta.descuentoTotal) row("Descuento", `- ${fmtCOP(venta.descuentoTotal)}`, 7);
 
   y += 1; rule(true);
-  row("TOTAL", fmtCOP(venta.total), 12, true);
+  y += 4.5;
+  doc.setTextColor(0, 0, 0); doc.setFont("courier", "bold"); doc.setFontSize(12);
+  doc.text("TOTAL", left, y);
+  doc.text(fmtCOP(venta.total), right, y, { align: "right" });
+  y += 5;
   rule(true); y += 1;
 
   row("Forma de pago", venta.tipo === "contado" ? (venta.metodoPago || "Contado") : venta.tipo === "credito" ? "Credito" : "Trade-In", 7, true);
