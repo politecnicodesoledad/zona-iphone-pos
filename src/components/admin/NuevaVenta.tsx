@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useProductos, useOtros, useVentas, useFacturaNum, useConfig, useVendidos, useSession, Store, uid, fmtFactura } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
+import { buscarClienteExistente } from "@/lib/zi/clientes";
 import { facturaWhatsappText, generarFacturaPDF } from "@/lib/zi/pdf";
 import { Card, Btn, Input, Select, Textarea, Field } from "./ui";
 import type { VentaProducto, Venta, Producto } from "@/lib/zi/types";
@@ -37,7 +38,7 @@ function Checkbox({ label, checked, onChange }: { label: string; checked: boolea
 export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [productos] = useProductos();
   const [otros] = useOtros();
-  const [, setVentas] = useVentas();
+  const [ventasExistentes, setVentas] = useVentas();
   const [num, setNum] = useFacturaNum();
   const [cfg] = useConfig();
   const { profile } = useSession();
@@ -60,6 +61,23 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [cCedula, setCCedula] = useState("");
   const [cTel, setCTel] = useState("");
   const [cDireccion, setCDireccion] = useState("");
+
+  // Reconocer cliente recurrente: en cuanto la cédula o el celular escritos
+  // coinciden con una venta anterior, avisamos quién es y desde cuándo
+  // compra — sin esto, cada venta se veía "nueva" aunque fuera la persona
+  // de siempre. La regla de "quién es quién" es la misma que usa la
+  // pantalla "Clientes", así que apenas guardas esta venta, cae
+  // automáticamente bajo el mismo historial.
+  const clienteExistente = useMemo(() => {
+    if (cCedula.trim().length < 5 && cTel.trim().length < 7) return null;
+    return buscarClienteExistente(ventasExistentes, { cedula: cCedula, telefono: cTel });
+  }, [ventasExistentes, cCedula, cTel]);
+
+  function usarDatosCliente() {
+    if (!clienteExistente) return;
+    setCNombre(clienteExistente.nombre);
+    if (showDireccion && clienteExistente.direccion) setCDireccion(clienteExistente.direccion);
+  }
 
   const [quickNombre, setQuickNombre] = useState("");
   const [quickCosto, setQuickCosto] = useState(0);
@@ -374,6 +392,17 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
               {showCedula && <Field label="Cédula del cliente"><Input value={cCedula} onChange={e => setCCedula(e.target.value.replace(/\D/g, ""))} placeholder="1.234.567.890" /></Field>}
               {showCelular && <Field label="Número de celular"><Input value={cTel} onChange={e => setCTel(e.target.value.replace(/\D/g, ""))} placeholder="300 123 4567" /></Field>}
               {showDireccion && <Field label="Dirección de entrega"><Input value={cDireccion} onChange={e => setCDireccion(e.target.value)} placeholder="Calle 123 #45-67" /></Field>}
+            </div>
+          )}
+          {clienteExistente && (
+            <div className="mt-3 flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
+              <div className="text-sm text-emerald-800">
+                <span className="font-bold">Cliente conocido:</span> {clienteExistente.nombre} · {clienteExistente.compras.length} compra{clienteExistente.compras.length !== 1 ? "s" : ""} anterior{clienteExistente.compras.length !== 1 ? "es" : ""}
+                <span className="text-emerald-600"> · última el {new Date(clienteExistente.ultimaCompra).toLocaleDateString("es-CO")}</span>
+              </div>
+              {clienteExistente.nombre.toLowerCase() !== cNombre.trim().toLowerCase() && (
+                <button type="button" onClick={usarDatosCliente} className="text-xs font-bold text-emerald-700 underline shrink-0">Usar sus datos</button>
+              )}
             </div>
           )}
         </Section>
