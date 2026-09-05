@@ -52,8 +52,8 @@ function exportHtmlExcel(head: string[], rows: unknown[][], filename: string) {
 
 export function exportarProductosExcel(productos: Producto[], filename = "productos-inventario.xls") {
   exportHtmlExcel(
-    ["Nombre", "Categoría", "Estado", "Stock", "Costo unitario", "Precio", "Inversión", "Ganancia potencial", "Local", "IMEI/Serial"],
-    productos.map(p => [p.nombre, p.categoria, p.estado, p.stock, p.costo, p.precio, p.costo * p.stock, (p.precio - p.costo) * p.stock, `Local ${p.local}`, p.imei || "—"]),
+    ["Nombre", "Categoría", "Estado", "Stock", "Costo unitario", "Precio", "Inversión", "Ganancia potencial", "Local", "Proveedor", "IMEI/Serial"],
+    productos.map(p => [p.nombre, p.categoria, p.estado, p.stock, p.costo, p.precio, p.costo * p.stock, (p.precio - p.costo) * p.stock, `Local ${p.local}`, p.proveedor || "—", p.imei || "—"]),
     filename,
   );
 }

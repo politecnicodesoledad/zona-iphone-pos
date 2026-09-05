@@ -54,25 +54,19 @@ export interface Venta {
   fechaManual?: boolean;
   tipo: "contado" | "credito" | "tradein";
   local: 1 | 2;
-  asesor?: string;       // nombre del asesor, solo informativo/visual
-  asesorId?: string;     // id real de auth.users — esto es lo que se valida en RLS
+  asesor?: string;
   productos: VentaProducto[];
   total: number;
-  descuentoTotal?: number;   // suma de descuentos por producto (legado)
-  descuentoOrden?: number;   // descuento en $ aplicado sobre el total de la venta
+  descuentoTotal?: number;
   metodoPago?: "efectivo" | "nequi" | "transferencia" | "datafono";
   recibido?: number;
-  imei?: string;
-  cliente?: { nombre: string; cedula?: string; telefono?: string; direccion?: string };
-  empresaCredito?: string;
+  cliente?: { nombre: string; cedula?: string; telefono?: string };
   creditoCuotas?: number;
   creditoCuotaInicial?: number;
   creditoValorCuota?: number;
   tradeIn?: { marca: string; modelo: string; imei?: string; valor: number; restante: number; metodoRestante: string };
   observaciones?: string;
-  garantia?: string;               // texto legal para la factura
-  garantiaMeses?: 0 | 6 | 12;       // duración estructurada
-  garantiaVencimiento?: number;     // timestamp — se calcula a partir de fecha + garantiaMeses
+  garantia?: string;
   cancelada?: boolean;
   canceladaEn?: number;
   razonCancelacion?: string;

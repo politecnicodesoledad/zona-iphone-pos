@@ -1,7 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { useVentas, useGastos, useConfig, useVendidos, useSession, uid } from "@/lib/zi/store";
-import { ziSupabase } from "@/integrations/supabase/zi-client";
-import type { Perfil } from "@/lib/zi/store";
+import { useState, useMemo } from "react";
+import { useVentas, useGastos, useConfig, useVendidos, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, fmtDateTime, rangeFor, type Periodo, maskCedula, dateInputToTime } from "@/lib/zi/format";
 import { generarFacturaPDF, exportarHistorialPDF, facturaWhatsappText } from "@/lib/zi/pdf";
 import { exportarVentasExcel, importarVentasDesdeExcel } from "@/lib/zi/excel";
@@ -43,8 +41,6 @@ function Historial() {
   const [ventas, setVentas] = useVentas();
   const [vendidos] = useVendidos();
   const [cfg] = useConfig();
-  const { isAdmin } = useSession();
-  const [asesores, setAsesores] = useState<Perfil[]>([]);
   const [tipo, setTipo] = useState("todos");
   const [local, setLocal] = useState("todos");
   const [periodo, setPeriodo] = useState<Periodo>("todos");
@@ -53,20 +49,6 @@ function Historial() {
   const [detail, setDetail] = useState<Venta | null>(null);
   const [pinModal, setPinModal] = useState<Venta | null>(null);
   const [pin, setPin] = useState(""); const [pinErr, setPinErr] = useState("");
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    ziSupabase.from("zi_perfiles").select("*").eq("rol", "asesor").order("nombre")
-      .then(({ data }) => setAsesores((data as Perfil[]) ?? []));
-  }, [isAdmin]);
-
-  const reasignar = useCallback((venta: Venta, asesorId: string) => {
-    const a = asesores.find(x => x.id === asesorId);
-    setVentas(prev => prev.map(v => v.id === venta.id
-      ? { ...v, asesorId: a?.id, asesor: a ? `${a.nombre} ${a.apellido}`.trim() : undefined }
-      : v));
-    setDetail(prev => prev && prev.id === venta.id ? { ...prev, asesorId: a?.id, asesor: a ? `${a.nombre} ${a.apellido}`.trim() : undefined } : prev);
-  }, [asesores, setVentas]);
 
   const [start, end] = rangeFor(periodo, dateInputToTime(from), dateInputToTime(to, true));
   const baseVentas = useMemo(() => ventasConArchivados(ventas, vendidos), [ventas, vendidos]);
@@ -115,19 +97,11 @@ function Historial() {
           <Select value={local} onChange={e => setLocal(e.target.value)} className="w-auto">
             <option value="todos">Todos los locales</option><option value="1">Local 1</option><option value="2">Local 2</option>
           </Select>
-          <Select value={periodo} onChange={e => setPeriodo(e.target.value as Periodo)} className="w-auto">
-            <option value="hoy">Hoy</option>
-            <option value="mes">Este mes</option>
-            <option value="todos">Todos</option>
-            <option value="custom">Fecha específica</option>
-          </Select>
-          {periodo === "custom" && (
-            <>
-              <div className="min-w-[260px]"><DateTriple value={from} onChange={v => setFrom(v)} /></div>
-              <span className="text-gray-500 text-xs">→</span>
-              <div className="min-w-[260px]"><DateTriple value={to} onChange={v => setTo(v)} /></div>
-            </>
+          {(["hoy","mes","todos"] as Periodo[]).map(p =>
+            <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1.5 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>{p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : "Todos"}</button>
           )}
+          <div className="min-w-[260px]"><DateTriple value={from} onChange={v => { setFrom(v); setPeriodo("custom"); }} /></div>
+          <div className="min-w-[260px]"><DateTriple value={to} onChange={v => { setTo(v); setPeriodo("custom"); }} /></div>
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por # o cliente" className="w-auto flex-1 min-w-[180px]" />
           <Btn
             variant="gold"
@@ -158,7 +132,7 @@ function Historial() {
           <div className="overflow-x-auto rounded-xl border border-[var(--line)]">
             <table className="w-full min-w-[980px] border-collapse text-sm">
               <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
-                <tr><th className="text-left px-3 py-3">Factura</th><th className="text-left px-3">Fecha</th><th className="text-left px-3">Cliente</th><th className="text-left px-3">Teléfono</th><th className="text-right px-3">Total</th>{isAdmin && <th className="text-right px-3">Ganancia</th>}{isAdmin && <th className="text-left px-3">Asesor</th>}<th className="px-3 text-left">Pago</th><th className="px-3"></th></tr>
+                <tr><th className="text-left px-3 py-3">Factura</th><th className="text-left px-3">Fecha</th><th className="text-left px-3">Cliente</th><th className="text-left px-3">Teléfono</th><th className="text-right px-3">Total</th><th className="text-right px-3">Ganancia</th><th className="px-3 text-left">Pago</th><th className="px-3"></th></tr>
               </thead>
               <tbody>
                 {list.map(v => {
@@ -170,8 +144,7 @@ function Historial() {
                     <td className="px-3 text-xs min-w-[180px]">{v.cliente?.nombre || "—"}</td>
                     <td className="px-3 text-xs whitespace-nowrap">{v.cliente?.telefono || "—"}</td>
                     <td className="px-3 text-right whitespace-nowrap">{fmtCOP(v.total)}</td>
-                    {isAdmin && <td className="px-3 text-right text-emerald-600 whitespace-nowrap">{fmtCOP(v.total - costo)}</td>}
-                    {isAdmin && <td className="px-3 text-xs whitespace-nowrap">{v.asesor || <span className="text-amber-600">Sin asignar</span>}</td>}
+                    <td className="px-3 text-right text-emerald-600 whitespace-nowrap">{fmtCOP(v.total - costo)}</td>
                     <td className="px-3 text-xs uppercase text-gray-500 whitespace-nowrap">{v.tipo}</td>
                     <td className="px-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                       <button title="Reimprimir" className="text-[var(--gold)] p-2" onClick={() => generarFacturaPDF(v, cfg)}><Printer className="w-4 h-4" /></button>
@@ -221,20 +194,7 @@ function Historial() {
               </div>
             )}
             {detail.observaciones && <div className="text-xs text-gray-400">📝 {detail.observaciones}</div>}
-            {isAdmin ? (
-              <div className="bg-[var(--mist)] rounded-lg p-3 text-xs space-y-2">
-                <div className="text-gray-500">Atendió: <b className="text-[var(--ink)]">{detail.asesor || "Sin asignar"}</b></div>
-                <div className="flex items-center gap-2">
-                  <Select value={detail.asesorId || ""} onChange={e => reasignar(detail, e.target.value)} className="flex-1">
-                    <option value="">— Sin asignar —</option>
-                    {asesores.map(a => <option key={a.id} value={a.id}>{a.nombre} {a.apellido}</option>)}
-                  </Select>
-                </div>
-                <p className="text-[10px] text-gray-400">Útil para pasarle a un asesor ventas que se registraron antes de crear su cuenta.</p>
-              </div>
-            ) : (
-              detail.asesor && <div className="text-xs">Atendió: <b>{detail.asesor}</b></div>
-            )}
+            {detail.asesor && <div className="text-xs">Atendió: <b>{detail.asesor}</b></div>}
             <div className="flex gap-2 pt-3 border-t border-[var(--line)]">
               <Btn variant="danger" onClick={() => setPinModal(detail)}><Trash2 className="inline w-3 h-3" /> Cancelar</Btn>
               <Btn variant="ghost" onClick={() => borrarVentaDefinitivo(detail)}><Trash2 className="inline w-3 h-3" /> Eliminar historial</Btn>
@@ -362,20 +322,13 @@ export function Gastos() {
 
       <Card>
         <div className="flex flex-wrap gap-2 mb-3 items-center">
-          <Select value={periodo} onChange={e => setPeriodo(e.target.value as Periodo)} className="w-auto">
-            <option value="hoy">Hoy</option>
-            <option value="mes">Este mes</option>
-            <option value="anio">Este año</option>
-            <option value="todos">Todos</option>
-            <option value="custom">Fecha específica</option>
-          </Select>
-          {periodo === "custom" && (
-            <>
-              <div className="min-w-[250px]"><DateTriple value={from} onChange={v => setFrom(v)} /></div>
-              <span className="text-gray-500 text-xs">→</span>
-              <div className="min-w-[250px]"><DateTriple value={to} onChange={v => setTo(v)} /></div>
-            </>
+          {(["hoy","mes","anio","todos"] as Periodo[]).map(p =>
+            <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>
+              {p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : p === "anio" ? "Este año" : "Todos"}
+            </button>
           )}
+          <div className="min-w-[250px]"><DateTriple value={from} onChange={v => { setFrom(v); setPeriodo("custom"); }} /></div>
+          <div className="min-w-[250px]"><DateTriple value={to} onChange={v => { setTo(v); setPeriodo("custom"); }} /></div>
         </div>
         <table className="w-full text-sm">
           <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">

@@ -94,10 +94,8 @@ function Ajustes() {
           <Field label="Favicon URL"><Input value={draft.faviconUrl} onChange={e => upd("faviconUrl", e.target.value)} /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="PIN cancelación (4 díg.)"><Input maxLength={4} value={draft.cancelPin} onChange={e => upd("cancelPin", e.target.value)} /></Field>
+            <Field label="Contraseña admin"><Input type="password" value={draft.adminPassword} onChange={e => upd("adminPassword", e.target.value)} /></Field>
           </div>
-          <p className="text-xs text-gray-400 -mt-2">
-            El acceso al panel ahora es individual por usuario. Para crear o cambiar el PIN de un asesor, ve a <b>Usuarios</b>.
-          </p>
         </div>
       </Card>
 

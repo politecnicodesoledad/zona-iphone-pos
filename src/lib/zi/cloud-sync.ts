@@ -1,18 +1,8 @@
 // Sincronización localStorage ⇆ Supabase para Zona iPhone.
 // Modelo: cada colección se sube/baja como filas { id, data: {...entidad} }.
 import { ziSupabase, ziCloudReady } from "@/integrations/supabase/zi-client";
-import { Store, DEFAULT_CONFIG, withTimeout } from "./store";
+import { Store, DEFAULT_CONFIG } from "./store";
 import type { Venta, ZIConfig } from "./types";
-
-// Ninguna llamada a Supabase dentro de este archivo puede quedarse esperando
-// para siempre: si la red de la persona se queda "a medias" (pasa sobre todo
-// en algunas Mac/Safari), sin este límite la sincronización se cuelga en
-// silencio — y como corre cada 15s (ver useCloudBoot), las llamadas colgadas
-// se acumulan y terminan tapando TODAS las conexiones del navegador,
-// incluido el propio login. Con el timeout, una falla se resuelve en 10s en
-// vez de bloquear la app indefinidamente.
-const NET_TIMEOUT = 10000;
-function withNetTimeout<T>(p: PromiseLike<T>, label: string) { return withTimeout(p, NET_TIMEOUT, label); }
 
 const COLLECTIONS = [
   { key: "productos", get: () => Store.productos(), set: (v: any[]) => Store.setProductos(v as any) },
@@ -73,12 +63,7 @@ async function upsertRows(key: string, items: any[]) {
   const rows = items.filter((it) => it?.id).map((it) => ({
     id: it.id,
     data: it,
-    ...(key === "ventas" ? {
-      fecha: new Date((it as Venta).fecha).toISOString(),
-      // RLS valida esta columna real, no lo que va dentro de "data" — por eso
-      // hay que replicarla aquí explícitamente.
-      asesor_id: (it as Venta).asesorId || null,
-    } : {}),
+    ...(key === "ventas" ? { fecha: new Date((it as Venta).fecha).toISOString() } : {}),
     updated_at: new Date().toISOString(),
   }));
   const result = rows.length ? await ziSupabase.from(`zi_${key}`).upsert(rows) : ({ error: null } as any);
@@ -115,22 +100,22 @@ export async function pushAllToCloud(): Promise<SyncReport> {
   try {
     // config
     const cfg = Store.config();
-    await withNetTimeout(ziSupabase.from("zi_config").upsert({ id: "singleton", data: cfg, updated_at: new Date().toISOString() }), "configuración");
+    await ziSupabase.from("zi_config").upsert({ id: "singleton", data: cfg, updated_at: new Date().toISOString() });
     details.push("✓ configuración");
 
     // counters
-    await withNetTimeout(ziSupabase.from("zi_counters").upsert({ name: "factura", value: Store.facturaNum(), updated_at: new Date().toISOString() }), "contador");
+    await ziSupabase.from("zi_counters").upsert({ name: "factura", value: Store.facturaNum(), updated_at: new Date().toISOString() });
     details.push("✓ contadores");
 
     for (const c of COLLECTIONS) {
       const items = c.get();
-      const { error } = await withNetTimeout(upsertRows(c.key, items), c.key);
+      const { error } = await upsertRows(c.key, items);
       if (error) throw new Error(`${c.key}: ${error.message}`);
       details.push(items.length === 0 ? `✓ ${c.key}: vacío sincronizado` : `✓ ${c.key}: ${items.length}`);
     }
     for (const k of RAW_COLLECTIONS) {
       const items = readLS<{ id: string }>(k);
-      const { error } = await withNetTimeout(upsertRows(k, items), k);
+      const { error } = await upsertRows(k, items);
       if (error) throw new Error(`${k}: ${error.message}`);
       details.push(items.length === 0 ? `✓ ${k}: vacío sincronizado` : `✓ ${k}: ${items.length}`);
     }
@@ -150,7 +135,7 @@ function mergeById<T extends { id: string }>(local: T[], remote: T[], preferLoca
 async function readCloudDeletions() {
   const out = new Map<string, Set<string>>();
   try {
-    const { data } = await withNetTimeout(ziSupabase.from("zi_deletions").select("collection,item_id"), "eliminaciones");
+    const { data } = await ziSupabase.from("zi_deletions").select("collection,item_id");
     (data || []).forEach((r: any) => {
       if (HISTORY_COLLECTIONS.has(r.collection)) return;
       if (!out.has(r.collection)) out.set(r.collection, new Set());
@@ -186,16 +171,16 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
   try {
     setApplyingCloud(true);
     const deleted = await readCloudDeletions();
-    const { data: cfgRow } = await withNetTimeout(ziSupabase.from("zi_config").select("data").eq("id", "singleton").maybeSingle(), "config");
+    const { data: cfgRow } = await ziSupabase.from("zi_config").select("data").eq("id", "singleton").maybeSingle();
     if (cfgRow?.data) {
       localStorage.setItem("zi_config", JSON.stringify({ ...DEFAULT_CONFIG, ...cfgRow.data }));
       details.push("✓ configuración");
     }
-    const { data: counter } = await withNetTimeout(ziSupabase.from("zi_counters").select("value").eq("name", "factura").maybeSingle(), "contador");
+    const { data: counter } = await ziSupabase.from("zi_counters").select("value").eq("name", "factura").maybeSingle();
     if (counter?.value) { writeLS("facturaNum", counter.value); details.push("✓ contadores"); }
 
     for (const c of COLLECTIONS) {
-      const { data, error } = await withNetTimeout(ziSupabase.from(`zi_${c.key}`).select("data"), c.key);
+      const { data, error } = await ziSupabase.from(`zi_${c.key}`).select("data");
       if (error) throw new Error(`${c.key}: ${error.message}`);
       const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(c.key));
       const local = c.get() as any[];
@@ -204,7 +189,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
       details.push(`✓ ${c.key}: ${arr.length}`);
     }
     for (const k of RAW_COLLECTIONS) {
-      const { data, error } = await withNetTimeout(ziSupabase.from(`zi_${k}`).select("data"), k);
+      const { data, error } = await ziSupabase.from(`zi_${k}`).select("data");
       if (error) throw new Error(`${k}: ${error.message}`);
       const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(k));
       const local = readLS<any>(k);
