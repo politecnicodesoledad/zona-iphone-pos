@@ -1,60 +1,16 @@
 import { useState, useMemo } from "react";
 import { useVentas } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, maskCedula } from "@/lib/zi/format";
+import { agregarClientes, type ClienteAgregado } from "@/lib/zi/clientes";
 import { Card, Input, Modal } from "./ui";
 import { Search, MessageCircle, CreditCard } from "lucide-react";
-import type { Venta } from "@/lib/zi/types";
-
-// "Clientes" simplificado: se arma directo del historial de ventas, no de un
-// CRM aparte. Lo único que realmente se usa del negocio es: nombre, cédula,
-// teléfono, dirección, historial de compras, y — cuando la venta fue a
-// crédito — con qué empresa se hizo. Nada de cuotas, mora ni proveedores.
-type ClienteAgregado = {
-  key: string;
-  nombre: string;
-  cedula?: string;
-  telefono?: string;
-  direccion?: string;
-  compras: Venta[];
-  total: number;
-  empresasCredito: string[];
-  ultimaCompra: number;
-};
-
-function claveCliente(v: Venta) {
-  const c = v.cliente;
-  if (!c) return null;
-  return (c.cedula || c.telefono || c.nombre || "").trim().toLowerCase() || null;
-}
 
 export function Clientes() {
   const [ventas] = useVentas();
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<ClienteAgregado | null>(null);
 
-  const clientes = useMemo(() => {
-    const map = new Map<string, ClienteAgregado>();
-    [...ventas].filter(v => !v.cancelada).sort((a, b) => a.fecha - b.fecha).forEach(v => {
-      const key = claveCliente(v);
-      if (!key) return;
-      const cur = map.get(key) || {
-        key, nombre: v.cliente!.nombre, cedula: v.cliente!.cedula, telefono: v.cliente!.telefono,
-        direccion: v.cliente!.direccion, compras: [], total: 0, empresasCredito: [], ultimaCompra: 0,
-      };
-      cur.nombre = v.cliente!.nombre || cur.nombre;
-      cur.cedula = v.cliente!.cedula || cur.cedula;
-      cur.telefono = v.cliente!.telefono || cur.telefono;
-      cur.direccion = v.cliente!.direccion || cur.direccion;
-      cur.compras.push(v);
-      cur.total += v.total;
-      cur.ultimaCompra = Math.max(cur.ultimaCompra, v.fecha);
-      if (v.tipo === "credito" && v.empresaCredito && !cur.empresasCredito.includes(v.empresaCredito)) {
-        cur.empresasCredito.push(v.empresaCredito);
-      }
-      map.set(key, cur);
-    });
-    return [...map.values()].sort((a, b) => b.ultimaCompra - a.ultimaCompra);
-  }, [ventas]);
+  const clientes = useMemo(() => agregarClientes(ventas), [ventas]);
 
   const filtrados = useMemo(() => {
     if (!q.trim()) return clientes;
@@ -92,7 +48,12 @@ export function Clientes() {
                 {filtrados.map(c => (
                   <tr key={c.key} onClick={() => setDetail(c)} className="border-t border-[var(--line)] hover:bg-[var(--mist)] cursor-pointer">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-[var(--ink)]">{c.nombre}</div>
+                      <div className="font-semibold text-[var(--ink)] flex items-center gap-1.5">
+                        {c.nombre}
+                        {c.compras.length > 1 && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[var(--gold)]/15 text-[var(--gold-dark)] uppercase tracking-wide">Recurrente</span>
+                        )}
+                      </div>
                       {c.cedula && <div className="text-xs text-gray-400">{maskCedula(c.cedula)}</div>}
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell text-gray-500">{c.telefono || "—"}</td>
