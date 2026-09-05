@@ -115,11 +115,19 @@ function Historial() {
           <Select value={local} onChange={e => setLocal(e.target.value)} className="w-auto">
             <option value="todos">Todos los locales</option><option value="1">Local 1</option><option value="2">Local 2</option>
           </Select>
-          {(["hoy","mes","todos"] as Periodo[]).map(p =>
-            <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1.5 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>{p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : "Todos"}</button>
+          <Select value={periodo} onChange={e => setPeriodo(e.target.value as Periodo)} className="w-auto">
+            <option value="hoy">Hoy</option>
+            <option value="mes">Este mes</option>
+            <option value="todos">Todos</option>
+            <option value="custom">Fecha específica</option>
+          </Select>
+          {periodo === "custom" && (
+            <>
+              <div className="min-w-[260px]"><DateTriple value={from} onChange={v => setFrom(v)} /></div>
+              <span className="text-gray-500 text-xs">→</span>
+              <div className="min-w-[260px]"><DateTriple value={to} onChange={v => setTo(v)} /></div>
+            </>
           )}
-          <div className="min-w-[260px]"><DateTriple value={from} onChange={v => { setFrom(v); setPeriodo("custom"); }} /></div>
-          <div className="min-w-[260px]"><DateTriple value={to} onChange={v => { setTo(v); setPeriodo("custom"); }} /></div>
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por # o cliente" className="w-auto flex-1 min-w-[180px]" />
           <Btn
             variant="gold"
@@ -354,13 +362,20 @@ export function Gastos() {
 
       <Card>
         <div className="flex flex-wrap gap-2 mb-3 items-center">
-          {(["hoy","mes","anio","todos"] as Periodo[]).map(p =>
-            <button key={p} onClick={() => setPeriodo(p)} className={`px-3 py-1 text-xs rounded-full uppercase font-semibold ${periodo===p ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>
-              {p === "hoy" ? "Hoy" : p === "mes" ? "Este mes" : p === "anio" ? "Este año" : "Todos"}
-            </button>
+          <Select value={periodo} onChange={e => setPeriodo(e.target.value as Periodo)} className="w-auto">
+            <option value="hoy">Hoy</option>
+            <option value="mes">Este mes</option>
+            <option value="anio">Este año</option>
+            <option value="todos">Todos</option>
+            <option value="custom">Fecha específica</option>
+          </Select>
+          {periodo === "custom" && (
+            <>
+              <div className="min-w-[250px]"><DateTriple value={from} onChange={v => setFrom(v)} /></div>
+              <span className="text-gray-500 text-xs">→</span>
+              <div className="min-w-[250px]"><DateTriple value={to} onChange={v => setTo(v)} /></div>
+            </>
           )}
-          <div className="min-w-[250px]"><DateTriple value={from} onChange={v => { setFrom(v); setPeriodo("custom"); }} /></div>
-          <div className="min-w-[250px]"><DateTriple value={to} onChange={v => { setTo(v); setPeriodo("custom"); }} /></div>
         </div>
         <table className="w-full text-sm">
           <thead className="text-[10px] text-gray-500 uppercase border-b border-[var(--line)]">
