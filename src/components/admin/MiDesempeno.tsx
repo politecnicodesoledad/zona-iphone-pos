@@ -16,6 +16,11 @@ function labelRango(fi: string, ff: string) {
   return `${start.toLocaleDateString("es-CO", opts)} — ${end.toLocaleDateString("es-CO", { ...opts, year: "numeric" })}`;
 }
 
+function monthBoundsISO(mesISO: string) {
+  const [y, m] = mesISO.split("-").map(Number);
+  return { start: new Date(y, m - 1, 1).getTime(), end: new Date(y, m, 0, 23, 59, 59, 999).getTime() };
+}
+
 type PagoRow = { id: string; fecha_inicio: string; fecha_fin: string; ganancia_neta: number; monto: number; pagado_en: string };
 
 // Panel del ASESOR: solo su propio rendimiento. Nunca costos de producto,
@@ -27,37 +32,40 @@ export function MiDesempeno() {
   const { profile } = useSession();
   const [cierre, setCierre] = useState<{ ganancia_neta: number; porcentaje: number; comision: number; estado: string } | null>(null);
   const [pagos, setPagos] = useState<PagoRow[]>([]);
-
-  const periodo = mesActualISO();
+  const [mesSel, setMesSel] = useState(mesActualISO());
 
   useEffect(() => {
     if (!profile) return;
-    ziSupabase.from("zi_comisiones").select("*").eq("id", `${profile.id}-${periodo}`).maybeSingle()
+    ziSupabase.from("zi_comisiones").select("*").eq("id", `${profile.id}-${mesSel}`).maybeSingle()
       .then(({ data }) => setCierre(data as typeof cierre));
     // RLS ya garantiza que solo veo mis propios pagos (asesor_id = auth.uid()).
     ziSupabase.from("zi_pagos_comisiones").select("*").eq("asesor_id", profile.id).order("fecha_fin", { ascending: false })
       .then(({ data }) => setPagos((data as PagoRow[]) ?? []));
-  }, [profile, periodo]);
+  }, [profile, mesSel]);
 
   const misVentas = useMemo(() => ventas.filter(v => v.asesorId === profile?.id && !v.cancelada).sort((a, b) => b.fecha - a.fecha), [ventas, profile]);
 
-  const { hoy, mes, gananciaMes } = useMemo(() => {
+  const { hoy, mes, gananciaMes, descuentosMes, credMes, contadoMes } = useMemo(() => {
     const now = new Date();
     const inicioHoy = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const { start: inicioMes, end: finMes } = monthBoundsISO(mesSel);
     const vHoy = misVentas.filter(v => v.fecha >= inicioHoy);
-    const vMes = misVentas.filter(v => v.fecha >= inicioMes);
+    const vMes = misVentas.filter(v => v.fecha >= inicioMes && v.fecha <= finMes);
     const ganancia = vMes.reduce((s, v) => s + (v.total - v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0)), 0);
     return {
       hoy: { cantidad: vHoy.length, total: vHoy.reduce((s, v) => s + v.total, 0) },
-      mes: { cantidad: vMes.length, total: vMes.reduce((s, v) => s + v.total, 0) },
+      mes: { cantidad: vMes.length, total: vMes.reduce((s, v) => s + v.total, 0), ventas: vMes },
       gananciaMes: ganancia,
+      descuentosMes: vMes.reduce((s, v) => s + (v.descuentoOrden || 0) + (v.descuentoTotal || 0), 0),
+      credMes: vMes.filter(v => v.tipo === "credito").length,
+      contadoMes: vMes.filter(v => v.tipo === "contado").length,
     };
-  }, [misVentas]);
+  }, [misVentas, mesSel]);
 
   const pct = profile?.comision_pct ?? 0;
   const comisionEstimada = Math.round(gananciaMes * (pct / 100));
-  const cerrado = cierre?.estado === "cerrado" || cierre?.estado === "pagado";
+  const esMesActual = mesSel === mesActualISO();
+  const cerrado = esMesActual && (cierre?.estado === "cerrado" || cierre?.estado === "pagado");
 
   return (
     <div className="space-y-5">
@@ -73,16 +81,30 @@ export function MiDesempeno() {
           <div className="text-sm text-gray-500">{fmtCOP(hoy.total)}</div>
         </Card>
         <Card>
-          <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-widest"><TrendingUp className="w-3.5 h-3.5" /> Este mes</div>
+          <div className="flex items-center justify-between text-gray-400 text-xs uppercase tracking-widest">
+            <span className="flex items-center gap-2"><TrendingUp className="w-3.5 h-3.5" /> Mes</span>
+            <input type="month" value={mesSel} onChange={e => setMesSel(e.target.value)}
+                   className="text-[11px] border border-[var(--line)] rounded-lg px-1.5 py-0.5 outline-none focus:border-[var(--gold)]" />
+          </div>
           <div className="font-display text-3xl text-[var(--ink)] mt-1">{mes.cantidad}</div>
           <div className="text-sm text-gray-500">{fmtCOP(mes.total)}</div>
         </Card>
         <Card className="bg-gradient-to-br from-[var(--gold-dark)]/20 to-[var(--gold)]/5 border-[var(--gold)]/40">
           <div className="flex items-center gap-2 text-[var(--gold-dark)] text-xs uppercase tracking-widest font-bold"><Award className="w-3.5 h-3.5" /> Comisión ({pct}%)</div>
           <div className="font-display text-3xl text-[var(--gold)] mt-1">{fmtCOP(cerrado ? cierre!.comision : comisionEstimada)}</div>
-          <div className="text-[11px] text-gray-500">{cerrado ? "Cerrada por el admin este mes" : "Generada hasta ahora — se confirma al cierre de mes"}</div>
+          <div className="text-[11px] text-gray-500">{cerrado ? "Cerrada por el admin este mes" : esMesActual ? "Generada hasta ahora este mes" : "Generada en el mes seleccionado"}</div>
         </Card>
       </div>
+
+      <Card>
+        <h3 className="font-display text-lg text-[var(--ink)] mb-3">Detalle del mes seleccionado</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <div><div className="text-xs text-gray-400">Ganancia neta generada</div><div className="font-semibold text-[var(--gold-dark)]">{fmtCOP(gananciaMes)}</div></div>
+          <div><div className="text-xs text-gray-400">Descuentos otorgados</div><div className="font-semibold text-[var(--ink)]">{fmtCOP(descuentosMes)}</div></div>
+          <div><div className="text-xs text-gray-400">Ventas de contado</div><div className="font-semibold text-[var(--ink)]">{contadoMes}</div></div>
+          <div><div className="text-xs text-gray-400">Ventas a crédito</div><div className="font-semibold text-[var(--ink)]">{credMes}</div></div>
+        </div>
+      </Card>
 
       <Card>
         <h3 className="font-display text-lg text-[var(--ink)] mb-3">Mis últimas ventas</h3>
