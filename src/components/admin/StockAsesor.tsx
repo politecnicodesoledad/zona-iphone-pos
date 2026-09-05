@@ -31,7 +31,10 @@ export function ProductosAsesor() {
     let base = todos;
     if (cat !== "todos") base = base.filter(p => p.categoria === cat);
     if (estado !== "todos") base = base.filter(p => p.estado === estado);
-    if (search) base = base.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()));
+    if (search) {
+      const s = search.trim().toLowerCase();
+      base = base.filter(p => p.nombre.toLowerCase().includes(s) || (p.imei || "").toLowerCase().includes(s));
+    }
     return base.sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [todos, search, cat, estado]);
 
@@ -42,7 +45,7 @@ export function ProductosAsesor() {
           <Field label="Buscar">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del equipo..." className="pl-9 w-56" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre o código..." className="pl-9 w-56" />
             </div>
           </Field>
           <Field label="Categoría">
