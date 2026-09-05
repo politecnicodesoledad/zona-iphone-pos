@@ -173,9 +173,20 @@ export function useCloudBoot() {
     if (cloudRuntimeStarted) return;
     cloudRuntimeStarted = true;
     cloudBooted = true;
-    const sync = () => import("./cloud-sync")
-      .then(async ({ pullAllFromCloud, pushAllToCloud }) => { await pullAllFromCloud({ merge: true, silent: true }); await pushAllToCloud(); })
-      .then(() => emit()).catch(() => {});
+    let syncing = false;
+    const sync = () => {
+      // Si la sincronización anterior todavía no ha terminado (por ejemplo,
+      // por una red lenta), no lanzamos otra encima — eso es justo lo que
+      // antes podía ir tapando las conexiones del navegador hasta que todo
+      // (incluido el login) se quedaba esperando para siempre.
+      if (syncing) return;
+      syncing = true;
+      import("./cloud-sync")
+        .then(async ({ pullAllFromCloud, pushAllToCloud }) => { await pullAllFromCloud({ merge: true, silent: true }); await pushAllToCloud(); })
+        .then(() => emit())
+        .catch(() => {})
+        .finally(() => { syncing = false; });
+    };
     sync();
     const i = window.setInterval(sync, 15000);
     const onFocus = () => sync();
@@ -253,7 +264,7 @@ let profileFetchToken = 0; // evita que una respuesta vieja pise una más nueva
 // Corta cualquier promesa que se quede colgada más de `ms` — en vez de dejar
 // la UI esperando para siempre (lo que pasaba en el MacBook: el botón se
 // quedaba en "Entrando..." sin fin si alguna llamada de red nunca resolvía).
-function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
+export function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`Tiempo de espera agotado: ${label}`)), ms);
     Promise.resolve(promise).then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
@@ -307,8 +318,23 @@ export function useSession() {
   const getSnapshot = useCallback(() => ziSessionState, []);
   const state = useSyncExternalStore(subscribe, getSnapshot, () => ziSessionState);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (identificador: string, password: string) => {
     try {
+      let email = identificador.trim();
+
+      // Si no parece un correo, es "Nombre Apellido": hay que resolverlo a
+      // un correo real antes de poder llamar a signInWithPassword (Supabase
+      // Auth siempre necesita un correo por debajo).
+      if (!email.includes("@")) {
+        const { data: resuelto, error: errResolver } = await withTimeout(
+          ziSupabase.rpc("zi_resolver_login", { identificador: email }),
+          10000, "búsqueda de usuario"
+        );
+        if (errResolver) return { ok: false as const, error: "No se pudo buscar ese usuario. Intenta con tu correo." };
+        if (!resuelto) return { ok: false as const, error: "No encontramos a nadie activo con ese nombre exacto. Verifica cómo está escrito o usa tu correo." };
+        email = resuelto as string;
+      }
+
       const { data, error } = await withTimeout(
         ziSupabase.auth.signInWithPassword({ email, password }),
         15000, "inicio de sesión"
