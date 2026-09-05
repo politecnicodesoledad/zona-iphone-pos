@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useVentas, useGastos, useEmpleados, useProductos, useOtros, useVendidos } from "@/lib/zi/store";
+import { useVentas, useGastos, useProductos, useOtros, useVendidos } from "@/lib/zi/store";
 import { fmtCOP, fmtDate, rangeFor, type Periodo, dateInputToTime } from "@/lib/zi/format";
 import { ventasConArchivados } from "@/lib/zi/sales-recovery";
 import { Card, Stat, Btn, DateTriple } from "./ui";
@@ -10,7 +10,6 @@ import type { Perfil } from "@/lib/zi/store";
 export function Ganancias() {
   const [ventas] = useVentas();
   const [gastos] = useGastos();
-  const [empleados] = useEmpleados();
   const [productos] = useProductos();
   const [otros] = useOtros();
   const [vendidos] = useVendidos();
@@ -40,6 +39,20 @@ export function Ganancias() {
   const [start, end] = rangeFor(periodo, dateInputToTime(from), dateInputToTime(to, true));
   const ventasBase = useMemo(() => ventasConArchivados(ventas, vendidos), [ventas, vendidos]);
 
+  // Comisiones PAGADAS en este período (no las generadas): se restan por la
+  // fecha en que el admin marcó el pago (pagado_en), no por la fecha de las
+  // ventas que las originaron — así "Ganancias" refleja lo que realmente
+  // salió de caja en el período que estás mirando.
+  const [comisionesPagadas, setComisionesPagadas] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    ziSupabase.from("zi_pagos_comisiones").select("monto")
+      .gte("pagado_en", new Date(start).toISOString())
+      .lte("pagado_en", new Date(end).toISOString())
+      .then(({ data }) => { if (alive) setComisionesPagadas((data ?? []).reduce((s, r: any) => s + (r.monto || 0), 0)); });
+    return () => { alive = false; };
+  }, [start, end]);
+
   const data = useMemo(() => {
     const vs = ventasBase.filter(v => !v.cancelada && v.fecha >= start && v.fecha <= end && (local === "todos" || String(v.local) === local));
     const gs = gastos.filter(g => g.fecha >= start && g.fecha <= end && g.tipo === "operativo" && (local === "todos" || String(g.local) === local));
@@ -49,12 +62,10 @@ export function Ganancias() {
     const inventario = [...productos, ...otros];
     const inversionActiva = inventario.filter(p => p.stock > 0 && (local === "todos" || String(p.local) === local)).reduce((s, p) => s + (p.costo || 0) * Math.max(0, p.stock || 0), 0);
     const inversion = inversionActiva + costoVendido;
-    const salarios = empleados.reduce((s, e) =>
-      s + e.historialPagos.filter(p => p.fecha >= start && p.fecha <= end).reduce((a, p) => a + p.monto, 0), 0);
     const gananciaBruta = ingresos - costoVendido;
-    const neta = gananciaBruta - operativos - salarios;
-    return { vs, ingresos, costoVendido, operativos, inversionActiva, inversion, salarios, gananciaBruta, neta };
-  }, [ventasBase, gastos, empleados, productos, otros, start, end, local]);
+    const neta = gananciaBruta - operativos - comisionesPagadas;
+    return { vs, ingresos, costoVendido, operativos, inversionActiva, inversion, comisionesPagadas, gananciaBruta, neta };
+  }, [ventasBase, gastos, productos, otros, start, end, local, comisionesPagadas]);
 
   // Rendimiento por asesor — agrupado por asesorId (el vínculo REAL con la
   // cuenta, el mismo que usa RLS y el módulo de Comisiones), no por el texto
@@ -143,7 +154,7 @@ export function Ganancias() {
             <Row label="− Costo de productos vendidos" v={-data.costoVendido} />
             <Row label="= Ganancia bruta" v={data.gananciaBruta} bold />
             <Row label="− Gastos operativos del período" v={-data.operativos} />
-            <Row label="− Salarios del período" v={-data.salarios} />
+            <Row label="− Comisiones de asesores PAGADAS en el período" v={-data.comisionesPagadas} />
             <div className="h-px bg-white/10" />
             <Row label="Lo que te queda (ganancia neta)" v={data.neta} bold color={data.neta < 0 ? "#ef4444" : "var(--gold)"} />
           </div>
