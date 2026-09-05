@@ -120,9 +120,10 @@ export function Ganancias() {
     <div className="space-y-5">
       <Card>
         <div className="flex flex-wrap gap-2 items-center">
-          {periodos.map(p => (
-            <button key={p.id} onClick={() => setPeriodo(p.id)} className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${periodo === p.id ? "bg-[var(--gold)] text-black" : "border border-[var(--line)] text-gray-400"}`}>{p.label}</button>
-          ))}
+          <select value={periodo} onChange={e => setPeriodo(e.target.value as Periodo)}
+                  className="px-3 py-1.5 bg-white border border-[var(--line)] rounded-full text-xs font-semibold uppercase tracking-wider text-[var(--ink)] outline-none focus:border-[var(--gold)]">
+            {periodos.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
           {periodo === "custom" && (
             <div className="flex gap-2 items-center">
               <div className="min-w-[250px]"><DateTriple value={from} onChange={setFrom} /></div>
