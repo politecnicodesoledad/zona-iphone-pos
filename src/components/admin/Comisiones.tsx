@@ -3,7 +3,7 @@ import { useVentas, useSession } from "@/lib/zi/store";
 import { fmtCOP, fmtDate } from "@/lib/zi/format";
 import { ziSupabase } from "@/integrations/supabase/zi-client";
 import { Card, Btn, Field } from "./ui";
-import { ChevronDown, ChevronUp, CheckCircle2, Loader2, History } from "lucide-react";
+import { ChevronDown, ChevronUp, CheckCircle2, Loader2, History, BarChart3 } from "lucide-react";
 import type { Perfil } from "@/lib/zi/store";
 
 type PagoRow = {
@@ -48,6 +48,13 @@ function labelRango(start: Date, end: Date) {
   return `${start.toLocaleDateString("es-CO", opts)} — ${end.toLocaleDateString("es-CO", { ...opts, year: "numeric" })}`;
 }
 
+function monthBoundsISO(mesISO: string) {
+  const [y, m] = mesISO.split("-").map(Number);
+  return { start: new Date(y, m - 1, 1), end: new Date(y, m, 0) };
+}
+function mesActualISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+const METODO_LABEL: Record<string, string> = { efectivo: "Efectivo", nequi: "Nequi", transferencia: "Transferencia", datafono: "Datáfono" };
+
 export function Comisiones() {
   const [ventas] = useVentas();
   const { profile } = useSession();
@@ -55,6 +62,8 @@ export function Comisiones() {
   const [ultimosPagos, setUltimosPagos] = useState<Record<string, PagoRow | null>>({});
   const [historiales, setHistoriales] = useState<Record<string, PagoRow[]>>({});
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
+  const [reportesAbiertos, setReportesAbiertos] = useState<Record<string, boolean>>({});
+  const [mesReporte, setMesReporte] = useState<Record<string, string>>({});
   const [pctDraft, setPctDraft] = useState<Record<string, number>>({});
   const [montoDraft, setMontoDraft] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -96,6 +105,27 @@ export function Comisiones() {
     });
     return map;
   }, [asesores, ultimosPagos, gananciaEnRango]);
+
+  // Reporte detallado de un asesor para un mes de calendario (independiente
+  // del rango de pago pendiente): cantidad, total, ganancia, descuentos,
+  // contado/crédito, y desglose por método de pago.
+  const reporteMensual = useCallback((asesorId: string, mesISO: string) => {
+    const { start, end } = monthBoundsISO(mesISO);
+    const from = startOfDay(start).getTime(), to = endOfDay(end).getTime();
+    const vs = ventas.filter(v => !v.cancelada && v.asesorId === asesorId && v.fecha >= from && v.fecha <= to);
+    const ganancia = vs.reduce((s, v) => s + (v.total - v.productos.reduce((a, p) => a + (p.costo || 0) * p.cantidad, 0)), 0);
+    const descuentos = vs.reduce((s, v) => s + (v.descuentoOrden || 0) + (v.descuentoTotal || 0), 0);
+    const porMetodo: Record<string, number> = {};
+    vs.forEach(v => { const m = v.metodoPago || "efectivo"; porMetodo[m] = (porMetodo[m] || 0) + v.total; });
+    return {
+      cantidad: vs.length,
+      total: vs.reduce((s, v) => s + v.total, 0),
+      ganancia, descuentos,
+      contado: vs.filter(v => v.tipo === "contado").length,
+      credito: vs.filter(v => v.tipo === "credito").length,
+      porMetodo,
+    };
+  }, [ventas]);
 
   async function guardarPct(asesorId: string) {
     const pct = pctDraft[asesorId] ?? 0;
@@ -147,6 +177,9 @@ export function Comisiones() {
             const monto = montoDraft[a.id] ?? sugerido;
             const hist = historiales[a.id] || [];
             const abierto = !!abiertos[a.id];
+            const reporteAbierto = !!reportesAbiertos[a.id];
+            const mesRep = mesReporte[a.id] || mesActualISO();
+            const rep = reporteMensual(a.id, mesRep);
             return (
               <Card key={a.id}>
                 <div className="flex items-start justify-between">
@@ -198,6 +231,37 @@ export function Comisiones() {
                         <div className="font-display text-sm text-[var(--gold-dark)]">{fmtCOP(p.monto)}</div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                <button onClick={() => setReportesAbiertos(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
+                        className="mt-2 text-[11px] text-gray-500 hover:text-[var(--gold-dark)] flex items-center gap-1 font-semibold">
+                  <BarChart3 className="w-3.5 h-3.5" /> Reporte detallado por mes {reporteAbierto ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {reporteAbierto && (
+                  <div className="mt-2 bg-[var(--mist)] rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] uppercase tracking-widest text-gray-500 font-bold">Mes a consultar</span>
+                      <input type="month" value={mesRep} onChange={e => setMesReporte(prev => ({ ...prev, [a.id]: e.target.value }))}
+                             className="text-xs border border-[var(--line)] rounded-lg px-2 py-1 outline-none focus:border-[var(--gold)] bg-white" />
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div><div className="text-gray-400">Ventas</div><div className="font-semibold text-[var(--ink)]">{rep.cantidad}</div></div>
+                      <div><div className="text-gray-400">Total vendido</div><div className="font-semibold text-[var(--ink)]">{fmtCOP(rep.total)}</div></div>
+                      <div><div className="text-gray-400">Ganancia neta</div><div className="font-semibold text-[var(--gold-dark)]">{fmtCOP(rep.ganancia)}</div></div>
+                      <div><div className="text-gray-400">Descuentos</div><div className="font-semibold text-[var(--ink)]">{fmtCOP(rep.descuentos)}</div></div>
+                      <div><div className="text-gray-400">Contado</div><div className="font-semibold text-[var(--ink)]">{rep.contado}</div></div>
+                      <div><div className="text-gray-400">Crédito</div><div className="font-semibold text-[var(--ink)]">{rep.credito}</div></div>
+                    </div>
+                    {Object.keys(rep.porMetodo).length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-[var(--line)] flex flex-wrap gap-2">
+                        {Object.entries(rep.porMetodo).map(([m, v]) => (
+                          <span key={m} className="text-[11px] bg-white border border-[var(--line)] rounded-full px-2 py-0.5">
+                            {METODO_LABEL[m] || m}: <b>{fmtCOP(v)}</b>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
