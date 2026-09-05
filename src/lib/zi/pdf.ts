@@ -45,40 +45,34 @@ async function toBlackWhite(dataUrl: string): Promise<string> {
 }
 
 // ───────── FACTURA TÉRMICA (una venta) ─────────
-// Fuente base: Helvetica (no Courier). Courier es un tipo "máquina de
-// escribir" con trazos gruesos que a tamaños pequeños se ve como negrilla
-// aunque no lo esté — por eso, aunque bold=false, antes se seguía viendo
-// "gorda". Helvetica es más liviana y estándar para recibos.
 export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   const rawLogo = cfg.logoUrl ? await loadImageAsDataURL(cfg.logoUrl) : undefined;
   const logoData = rawLogo ? await toBlackWhite(rawLogo) : undefined;
-  const estimatedProductLines = venta.productos.reduce((sum, producto) => sum + Math.max(1, Math.ceil(producto.nombre.length / 22)), 0);
-  const estimatedHeight = 172 + estimatedProductLines * 5.6 + (venta.observaciones ? 13 : 0) + (venta.tipo === "credito" ? 12 : 0) + (venta.tipo === "tradein" ? 16 : 0);
-  const receiptHeight = Math.max(200, Math.min(360, estimatedHeight));
+  const estimatedProductLines = venta.productos.reduce((sum, producto) => sum + Math.max(1, Math.ceil(producto.nombre.length / 25)), 0);
+  const estimatedHeight = 148 + estimatedProductLines * 4.6 + (venta.observaciones ? 11 : 0) + (venta.tipo === "credito" ? 10 : 0) + (venta.tipo === "tradein" ? 14 : 0);
+  const receiptHeight = Math.max(175, Math.min(330, estimatedHeight));
   const doc = new jsPDF({ unit: "mm", format: [80, receiptHeight] });
   const w = 80;
   const left = 5;
   const right = w - 5;
-  let y = 7;
-
-  const FONT = "helvetica";
+  let y = 6;
 
   if (logoData) {
-    try { doc.addImage(logoData, "PNG", (w - 16) / 2, y, 16, 16); y += 19; } catch { /* skip */ }
+    try { doc.addImage(logoData, "PNG", (w - 15) / 2, y, 15, 15); y += 17; } catch { /* skip */ }
   }
 
   const center = (txt: string, size: number, bold = false) => {
     doc.setFontSize(size);
-    doc.setFont(FONT, bold ? "bold" : "normal");
+    doc.setFont("courier", bold ? "bold" : "normal");
     doc.setTextColor(0, 0, 0);
     doc.text(txt, w / 2, y, { align: "center" });
-    y += size * 0.5;
+    y += size * 0.42;
   };
   const rule = (heavy = false) => {
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(heavy ? 0.45 : 0.18);
     doc.line(left, y, right, y);
-    y += heavy ? 3 : 2.6;
+    y += heavy ? 2.5 : 2;
   };
   const dash = () => {
     doc.setDrawColor(0, 0, 0);
@@ -86,103 +80,104 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
     doc.setLineDashPattern([0.7, 0.7], 0);
     doc.line(left, y, right, y);
     doc.setLineDashPattern([], 0);
-    y += 3.2;
+    y += 2.5;
   };
-  const row = (l: string, r: string, size = 8.5, bold = false) => {
+  const row = (l: string, r: string, size = 8, bold = false) => {
     doc.setFontSize(size);
-    doc.setFont(FONT, bold ? "bold" : "normal");
+    doc.setFont("courier", bold ? "bold" : "normal");
     doc.setTextColor(0, 0, 0);
     doc.text(l, left, y);
     doc.text(r, right, y, { align: "right" });
-    y += size * 0.68;
+    y += size * 0.55;
   };
 
-  center(cfg.storeName.toUpperCase().replace("ZONA IPHONE", "ZONA  IPHONE"), 15, true);
-  y += 1;
-  center("FACTURA DE VENTA", 9, true);
-  center((cfg.facturaSubtitulo || "CELULARES & ACCESORIOS").toUpperCase(), 7.8);
-  center("NIT: 1001882175", 7.8);
+  center(cfg.storeName.toUpperCase().replace("ZONA IPHONE", "ZONA  IPHONE"), 13, true);
+  center("FACTURA DE VENTA", 8, true);
+  center((cfg.facturaSubtitulo || "CELULARES & ACCESORIOS").toUpperCase(), 7);
+  center("NIT: 1001882175", 7);
   const addressLines = doc.splitTextToSize(cfg.direccion, 62);
-  doc.setFontSize(7.6); doc.setFont(FONT, "normal"); doc.setTextColor(0, 0, 0);
-  doc.text(addressLines, w / 2, y, { align: "center" }); y += addressLines.length * 3.6 + 1.5;
-  center("+" + cfg.whatsapp, 7.8);
-  center("zonaiphone23@gmail.com", 7.6);
-  y += 1.5; dash();
+  doc.setFontSize(6.8); doc.setFont("courier", "normal"); doc.setTextColor(0, 0, 0);
+  doc.text(addressLines, w / 2, y, { align: "center" }); y += addressLines.length * 3.1 + 1;
+  center("+" + cfg.whatsapp, 7);
+  center("zonaiphone23@gmail.com", 6.8);
+  y += 1; dash();
 
   const fecha = new Date(venta.fecha).toLocaleDateString("es-CO");
   const hora = new Date(venta.fecha).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
-  row("Numero", venta.factura, 8.8, true);
-  row("Fecha", `${fecha}  ${hora}`, 8, false);
-  row("Sucursal", venta.local === 1 ? cfg.local1nombre : cfg.local2nombre, 8.6, false);
-  row("Vendedor", venta.asesor || "—", 8.6, false);
-  y += 0.8; dash();
+  row("Numero", venta.factura, 7, true);
+  row("Fecha", `${fecha}  ${hora}`, 6.2);
+  row("Sucursal", venta.local === 1 ? cfg.local1nombre : cfg.local2nombre, 7);
+  row("Vendedor", venta.asesor || "—", 7);
+  dash();
 
   if (venta.cliente?.nombre) {
-    row("Cliente", venta.cliente.nombre.toUpperCase(), 8.8, true);
-    if (venta.cliente.cedula) row("Identificacion", venta.cliente.cedula, 8.6, false);
-    if (venta.cliente.telefono) row("Telefono", venta.cliente.telefono, 8.6, false);
-    y += 0.8; dash();
+    // Antes tenía bold=true, quedaba muy pesado. Solo se pide quitarle la
+    // negrilla al nombre del cliente y darle un poco más de tamaño/aire.
+    row("Cliente", venta.cliente.nombre.toUpperCase(), 8.2, false);
+    if (venta.cliente.cedula) row("Identificacion", venta.cliente.cedula, 7);
+    if (venta.cliente.telefono) row("Telefono", venta.cliente.telefono, 7);
+    y += 0.6;
+    dash();
   }
 
-  doc.setFontSize(9.3); doc.setFont(FONT, "bold"); doc.setTextColor(0, 0, 0);
-  doc.text("DETALLE", left, y); y += 5.5;
+  doc.setFontSize(7.5); doc.setFont("courier", "bold"); doc.setTextColor(0, 0, 0);
+  doc.text("DETALLE", left, y); y += 4;
 
-  venta.productos.forEach((p, i) => {
-    if (i > 0) y += 1.2;
+  venta.productos.forEach(p => {
     const lines = doc.splitTextToSize(p.nombre.toUpperCase(), 48);
-    doc.setFont(FONT, "bold"); doc.setFontSize(8.6); doc.setTextColor(0, 0, 0);
+    doc.setFont("courier", "bold"); doc.setFontSize(7); doc.setTextColor(0, 0, 0);
     doc.text(lines, left, y);
-    y += lines.length * 4.2;
-    row(`${p.cantidad} x ${fmtCOP(p.precioUnitario)}`, fmtCOP(p.subtotal), 8.6, false);
-    if (p.descuento) row("Descuento", `- ${fmtCOP(p.descuento)}`, 7.9, false);
-    if (p.color) row("Color", p.color, 7.9, false);
+    y += lines.length * 3.2;
+    row(`${p.cantidad} x ${fmtCOP(p.precioUnitario)}`, fmtCOP(p.subtotal), 7, true);
+    if (p.descuento) row("Descuento", `- ${fmtCOP(p.descuento)}`, 6.5);
+    if (p.color) row("Color", p.color, 6.5);
   });
-  y += 0.8; dash();
-  row("Subtotal", fmtCOP(venta.total + (venta.descuentoTotal || 0)), 8.6, false);
-  if (venta.descuentoTotal) row("Descuento", `- ${fmtCOP(venta.descuentoTotal)}`, 8.6, false);
+  dash();
+  row("Subtotal", fmtCOP(venta.total + (venta.descuentoTotal || 0)), 7);
+  if (venta.descuentoTotal) row("Descuento", `- ${fmtCOP(venta.descuentoTotal)}`, 7);
 
-  y += 1.5; rule(true);
-  y += 5.5;
-  doc.setTextColor(0, 0, 0); doc.setFont(FONT, "bold"); doc.setFontSize(15);
+  y += 1; rule(true);
+  y += 4.5;
+  doc.setTextColor(0, 0, 0); doc.setFont("courier", "bold"); doc.setFontSize(12);
   doc.text("TOTAL", left, y);
   doc.text(fmtCOP(venta.total), right, y, { align: "right" });
-  y += 5.5;
-  rule(true); y += 1.5;
+  y += 5;
+  rule(true); y += 1;
 
-  row("Forma de pago", venta.tipo === "contado" ? (venta.metodoPago || "Contado") : venta.tipo === "credito" ? "Credito" : "Trade-In", 8.6, false);
+  row("Forma de pago", venta.tipo === "contado" ? (venta.metodoPago || "Contado") : venta.tipo === "credito" ? "Credito" : "Trade-In", 7, true);
   if (venta.tipo === "contado" && venta.recibido) {
-    row("Pago recibido", fmtCOP(venta.recibido), 8.6, false);
-    row("Cambio", fmtCOP(Math.max(0, venta.recibido - venta.total)), 8.6, true);
+    row("Pago recibido", fmtCOP(venta.recibido), 7);
+    row("Cambio", fmtCOP(Math.max(0, venta.recibido - venta.total)), 7, true);
   }
   if (venta.tipo === "credito") {
-    row("Cuota inicial", fmtCOP(venta.creditoCuotaInicial || 0), 8.6, false);
-    row("Cuotas", `${venta.creditoCuotas} x ${fmtCOP(venta.creditoValorCuota || 0)}`, 8.6, false);
+    row("Cuota inicial", fmtCOP(venta.creditoCuotaInicial || 0), 7);
+    row("Cuotas", `${venta.creditoCuotas} x ${fmtCOP(venta.creditoValorCuota || 0)}`, 7);
   }
   if (venta.tipo === "tradein" && venta.tradeIn) {
-    row("Equipo recibido", `${venta.tradeIn.marca} ${venta.tradeIn.modelo}`, 8.6, false);
-    row("Valor equipo", fmtCOP(venta.tradeIn.valor), 8.6, false);
-    row("Restante", `${fmtCOP(venta.tradeIn.restante)} (${venta.tradeIn.metodoRestante})`, 8.6, false);
+    row("Equipo recibido", `${venta.tradeIn.marca} ${venta.tradeIn.modelo}`, 7);
+    row("Valor equipo", fmtCOP(venta.tradeIn.valor), 7);
+    row("Restante", `${fmtCOP(venta.tradeIn.restante)} (${venta.tradeIn.metodoRestante})`, 7);
   }
   if (venta.observaciones) {
-    y += 1.5; doc.setFont(FONT, "bold"); doc.setFontSize(8.3); doc.text("OBSERVACIONES", left, y); y += 4.8;
-    doc.setFont(FONT, "normal"); doc.setFontSize(8.3);
+    y += 1; doc.setFont("courier", "bold"); doc.setFontSize(6.5); doc.text("OBSERVACIONES", left, y); y += 3.5;
+    doc.setFont("courier", "normal");
     const obs = doc.splitTextToSize(venta.observaciones, right - left);
-    doc.text(obs, left, y); y += obs.length * 4;
+    doc.text(obs, left, y); y += obs.length * 3;
   }
-  y += 1.5; dash();
-
-  doc.setFontSize(8.6); doc.setFont(FONT, "bold"); doc.setTextColor(0, 0, 0);
-  doc.text("GARANTIA", left, y); y += 5.5;
-  doc.setFont(FONT, "normal"); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
-  const garantia = doc.splitTextToSize(venta.garantia || cfg.facturaGarantia, right - left);
-  doc.text(garantia, left, y); y += garantia.length * 4.2;
-
-  y += 3;
-  if (venta.asesor) { center(`Atendido por: ${venta.asesor}`, 7.8, false); }
   y += 1; dash();
-  doc.setFontSize(13); doc.setFont(FONT, "bold"); doc.setTextColor(0, 0, 0);
-  doc.text("¡Gracias por su compra!", w / 2, y, { align: "center" }); y += 6.5;
-  doc.setFontSize(7.8); doc.setFont(FONT, "normal");
+
+  doc.setFontSize(6.8); doc.setFont("courier", "bold"); doc.setTextColor(0, 0, 0);
+  doc.text("GARANTIA", left, y); y += 4;
+  doc.setFont("courier", "normal"); doc.setTextColor(0, 0, 0);
+  const garantia = doc.splitTextToSize(venta.garantia || cfg.facturaGarantia, right - left);
+  doc.text(garantia, left, y); y += garantia.length * 3.2;
+
+  y += 2;
+  if (venta.asesor) { center(`Atendido por: ${venta.asesor}`, 6); }
+  dash();
+  doc.setFontSize(11); doc.setFont("courier", "bold"); doc.setTextColor(0, 0, 0);
+  doc.text("¡Gracias por su compra!", w / 2, y, { align: "center" }); y += 6;
+  doc.setFontSize(6); doc.setFont("courier", "normal");
   const gracias = doc.splitTextToSize(cfg.facturaGracias, w - 8);
   doc.text(gracias, w / 2, y, { align: "center" });
 
