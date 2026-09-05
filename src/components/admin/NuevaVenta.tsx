@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useProductos, useOtros, useVentas, useFacturaNum, useConfig, useVendidos, useSession, Store, uid, fmtFactura } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
 import { facturaWhatsappText, generarFacturaPDF } from "@/lib/zi/pdf";
@@ -97,9 +97,23 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const matches = useMemo(() => {
     let base = disponibles;
     if (catFilter !== "todos") base = base.filter(p => p.categoria === catFilter);
-    if (search) base = base.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()));
+    if (search) {
+      const s = search.trim().toLowerCase();
+      base = base.filter(p => p.nombre.toLowerCase().includes(s) || (p.imei || "").toLowerCase().includes(s));
+    }
     return base.slice(0, 100);
   }, [disponibles, search, catFilter]);
+
+  // Si el texto escaneado/escrito coincide EXACTO con el serial de un solo
+  // producto (así es como trabaja un lector de código de barras: escribe el
+  // código completo y manda Enter), lo seleccionamos de una vez — sin esto,
+  // había que además abrir el desplegable y buscarlo manualmente.
+  useEffect(() => {
+    const s = search.trim().toLowerCase();
+    if (s.length < 4) return;
+    const exactos = disponibles.filter(p => (p.imei || "").toLowerCase() === s);
+    if (exactos.length === 1) setSelectedId(exactos[0].id);
+  }, [search, disponibles]);
 
   const itemsTotal = items.reduce((s, i) => s + i.subtotal, 0);
   const descuentoItems = items.reduce((s, i) => s + (i.descuento || 0), 0);
@@ -290,7 +304,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
             <Field label="Buscar producto">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del producto..." className="pl-9" />
+                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre o escanea el código de barras..." className="pl-9" />
               </div>
             </Field>
           </div>
