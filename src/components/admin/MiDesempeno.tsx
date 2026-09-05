@@ -3,13 +3,20 @@ import { useVentas, useSession, useGastos, uid } from "@/lib/zi/store";
 import { fmtCOP, fmtDate } from "@/lib/zi/format";
 import { ziSupabase } from "@/integrations/supabase/zi-client";
 import { Card, Field, Input, Select, Btn } from "./ui";
-import { TrendingUp, Calendar, Award, ShieldCheck, ReceiptText } from "lucide-react";
+import { TrendingUp, Calendar, Award, ShieldCheck, ReceiptText, Wallet } from "lucide-react";
 import type { Gasto } from "@/lib/zi/types";
 
 function mesActualISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
+function labelRango(fi: string, ff: string) {
+  const opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short" };
+  const start = new Date(fi + "T12:00:00"), end = new Date(ff + "T12:00:00");
+  return `${start.toLocaleDateString("es-CO", opts)} — ${end.toLocaleDateString("es-CO", { ...opts, year: "numeric" })}`;
+}
+
+type PagoRow = { id: string; fecha_inicio: string; fecha_fin: string; ganancia_neta: number; monto: number; pagado_en: string };
 
 // Panel del ASESOR: solo su propio rendimiento. Nunca costos de producto,
 // nunca la utilidad neta global del negocio, nunca ventas de otros asesores
@@ -19,6 +26,7 @@ export function MiDesempeno() {
   const [ventas] = useVentas();
   const { profile } = useSession();
   const [cierre, setCierre] = useState<{ ganancia_neta: number; porcentaje: number; comision: number; estado: string } | null>(null);
+  const [pagos, setPagos] = useState<PagoRow[]>([]);
 
   const periodo = mesActualISO();
 
@@ -26,6 +34,9 @@ export function MiDesempeno() {
     if (!profile) return;
     ziSupabase.from("zi_comisiones").select("*").eq("id", `${profile.id}-${periodo}`).maybeSingle()
       .then(({ data }) => setCierre(data as typeof cierre));
+    // RLS ya garantiza que solo veo mis propios pagos (asesor_id = auth.uid()).
+    ziSupabase.from("zi_pagos_comisiones").select("*").eq("asesor_id", profile.id).order("fecha_fin", { ascending: false })
+      .then(({ data }) => setPagos((data as PagoRow[]) ?? []));
   }, [profile, periodo]);
 
   const misVentas = useMemo(() => ventas.filter(v => v.asesorId === profile?.id && !v.cancelada).sort((a, b) => b.fecha - a.fecha), [ventas, profile]);
@@ -91,6 +102,26 @@ export function MiDesempeno() {
                   </div>
                 </div>
                 <div className="font-display text-lg text-[var(--gold)]">{fmtCOP(v.total)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <h3 className="font-display text-lg text-[var(--ink)] mb-1 flex items-center gap-2"><Wallet className="w-4 h-4 text-[var(--gold-dark)]" /> Pagos de comisión recibidos</h3>
+        <p className="text-xs text-gray-500 mb-3">Lo que ya te pagaron. Distinto de "Comisión ({pct}%)" de arriba, que es lo que llevas generado y aún no se ha pagado.</p>
+        {pagos.length === 0 ? (
+          <p className="text-sm text-gray-400 py-4 text-center">Aún no tienes pagos de comisión registrados.</p>
+        ) : (
+          <div className="divide-y divide-[var(--line)]">
+            {pagos.map(p => (
+              <div key={p.id} className="py-2.5 flex items-center justify-between text-sm">
+                <div>
+                  <div className="font-semibold text-[var(--ink)]">{labelRango(p.fecha_inicio, p.fecha_fin)}</div>
+                  <div className="text-xs text-gray-500">Pagado el {fmtDate(new Date(p.pagado_en).getTime())} · ganancia generada {fmtCOP(p.ganancia_neta)}</div>
+                </div>
+                <div className="font-display text-lg text-[var(--gold)]">{fmtCOP(p.monto)}</div>
               </div>
             ))}
           </div>
