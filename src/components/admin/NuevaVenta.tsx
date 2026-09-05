@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useProductos, useOtros, useVentas, useClientes, useFacturaNum, useConfig, useVendidos, useSession, Store, uid, fmtFactura } from "@/lib/zi/store";
+import { useProductos, useOtros, useVentas, useFacturaNum, useConfig, useVendidos, useSession, Store, uid, fmtFactura } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
 import { facturaWhatsappText, generarFacturaPDF } from "@/lib/zi/pdf";
 import { Card, Btn, Input, Select, Textarea, Field } from "./ui";
@@ -38,7 +38,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [productos] = useProductos();
   const [otros] = useOtros();
   const [, setVentas] = useVentas();
-  const [, setClientes] = useClientes();
   const [num, setNum] = useFacturaNum();
   const [cfg] = useConfig();
   const { profile } = useSession();
@@ -247,24 +246,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
 
     setVentas(prev => [...prev, venta]);
     setNum(Math.max(num, facturaNum) + 1);
-
-    if (tipoPago === "credito" && cNombre) {
-      const cuotas = Array.from({ length: cCuotas }, (_, i) => ({
-        numero: i + 1,
-        fechaPago: Date.now() + (i + 1) * 30 * 86400000,
-        monto: cValorCuota,
-        estado: "pendiente" as const,
-      }));
-      setClientes(prev => [...prev, {
-        id: uid(), nombre: cNombre, cedula: cCedula, telefono: cTel,
-        producto: items.map(i => i.nombre).join(", "),
-        total, cuotaInicial: cInicial, cuotas: cCuotas, cuotasPagadas: 0,
-        valorCuota: cValorCuota, estado: "al_dia",
-        proximoPago: Date.now() + 30 * 86400000,
-        cuotasDetalle: cuotas, historialAbonos: [{ fecha: Date.now(), monto: cInicial, nota: "Cuota inicial" }],
-        ventaId: venta.id,
-      }]);
-    }
     setUltima(venta);
     // reset
     setItems([]); setObs(""); setGarantiaMeses(0); setRecibido(0); setPinFecha(""); setFechaFactura(new Date().toISOString().slice(0, 16));
