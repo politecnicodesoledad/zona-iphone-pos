@@ -6,12 +6,12 @@ import { Ganancias } from "./Ganancias";
 import { NuevaVenta } from "./NuevaVenta";
 import { Finanzas, Gastos } from "./Finanzas";
 import { Inventario } from "./Inventario";
-import { ClientesEmpleados } from "./ClientesEmpleados";
+import { Clientes } from "./Clientes";
 import { Configuracion } from "./Configuracion";
 import { Usuarios } from "./Usuarios";
 import { Comisiones } from "./Comisiones";
 import { MiDesempeno } from "./MiDesempeno";
-import { ProductosAsesor } from "./ProductosAsesor";
+import { ProductosAsesor } from "./StockAsesor";
 
 type Mod = "ganancias" | "mirendimiento" | "venta" | "movimientos" | "gastos" | "inventario" | "productos" | "clientes" | "usuarios" | "comisiones" | "config";
 
@@ -38,7 +38,7 @@ export function AdminShell() {
     ...(isAdmin ? [{ id: "ganancias" as Mod, icon: BarChart3, label: "Ganancias" }] : []),
     ...(!isAdmin ? [{ id: "mirendimiento" as Mod, icon: Award, label: "Mi rendimiento" }] : []),
     { id: "venta", icon: ShoppingBag, label: "Nueva venta", badge: fmtFactura(num) },
-    ...(!isAdmin ? [{ id: "productos" as Mod, icon: Package, label: "Productos" }] : []),
+    ...(!isAdmin ? [{ id: "productos" as Mod, icon: Package, label: "Stock" }] : []),
     { id: "movimientos", icon: Wallet, label: "Movimientos" },
     ...(isAdmin ? [{ id: "gastos" as Mod, icon: ReceiptText, label: "Gastos" }] : []),
     ...(isAdmin ? [{ id: "inventario" as Mod, icon: Package, label: "Inventario" }] : []),
@@ -55,8 +55,8 @@ export function AdminShell() {
     movimientos: "Movimientos e historial",
     gastos: "Gastos operativos",
     inventario: "Inventario",
-    productos: "Catálogo de productos",
-    clientes: "Clientes y empleados",
+    productos: "Stock disponible",
+    clientes: "Clientes",
     usuarios: "Usuarios y asesores",
     comisiones: "Reportes de asesores",
     config: "Configuración",
@@ -135,7 +135,7 @@ export function AdminShell() {
             {mod === "gastos" && isAdmin && <Gastos />}
             {mod === "inventario" && isAdmin && <Inventario />}
             {mod === "productos" && !isAdmin && <ProductosAsesor />}
-            {mod === "clientes" && <ClientesEmpleados />}
+            {mod === "clientes" && <Clientes />}
             {mod === "usuarios" && isAdmin && <Usuarios />}
             {mod === "comisiones" && isAdmin && <Comisiones />}
             {mod === "config" && isAdmin && <Configuracion />}
