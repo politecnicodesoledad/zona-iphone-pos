@@ -5,6 +5,10 @@ import type { Perfil } from "@/lib/zi/store";
 
 const FN_URL = "https://nompupohkjwhzhphuonk.supabase.co/functions/v1/admin-users";
 
+const FRECUENCIA_LABEL: Record<string, string> = {
+  semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual",
+};
+
 async function callAdminUsers(body: Record<string, unknown>) {
   const { data } = await ziSupabase.auth.getSession();
   const token = data.session?.access_token;
@@ -68,6 +72,7 @@ export function Usuarios() {
                 <th className="text-left px-4 py-3">Nombre</th>
                 <th className="text-left px-4 py-3 hidden sm:table-cell">Correo</th>
                 <th className="text-left px-4 py-3">Rol</th>
+                <th className="text-left px-4 py-3 hidden md:table-cell">Pago</th>
                 <th className="text-left px-4 py-3">Estado</th>
                 <th className="text-right px-4 py-3">Acciones</th>
               </tr>
@@ -81,6 +86,13 @@ export function Usuarios() {
                     <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${p.rol === "admin" ? "bg-[var(--gold)]/20 text-[var(--gold-dark)]" : "bg-gray-100 text-gray-600"}`}>
                       {p.rol === "admin" ? "ADMIN" : "ASESOR"}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {p.rol === "asesor" && (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-[var(--mist)] text-gray-600 capitalize">
+                        {FRECUENCIA_LABEL[p.frecuencia_pago] || "Mensual"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${p.activo ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
@@ -175,6 +187,7 @@ function NuevoAsesorModal({ onClose, onCreated }: { onClose: () => void; onCreat
 function EditarNombreModal({ perfil, onClose, onDone }: { perfil: Perfil; onClose: () => void; onDone: () => void }) {
   const [nombre, setNombre] = useState(perfil.nombre);
   const [apellido, setApellido] = useState(perfil.apellido || "");
+  const [frecuencia, setFrecuencia] = useState(perfil.frecuencia_pago || "mensual");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -184,6 +197,13 @@ function EditarNombreModal({ perfil, onClose, onDone }: { perfil: Perfil; onClos
     setErr("");
     try {
       await callAdminUsers({ action: "update", userId: perfil.id, nombre, apellido });
+      if (perfil.rol === "asesor" && frecuencia !== perfil.frecuencia_pago) {
+        // Campo propio del perfil (no requiere la función admin-users): la
+        // política RLS "perfiles_update" ya permite que un ADMIN actualice
+        // cualquier fila de zi_perfiles directamente.
+        const { error } = await ziSupabase.from("zi_perfiles").update({ frecuencia_pago: frecuencia }).eq("id", perfil.id);
+        if (error) throw error;
+      }
       onDone();
     } catch (e2) {
       setErr((e2 as Error).message);
@@ -196,8 +216,8 @@ function EditarNombreModal({ perfil, onClose, onDone }: { perfil: Perfil; onClos
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl relative">
         <button onClick={onClose} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
-        <h3 className="font-display text-lg text-[var(--ink)]">Editar nombre</h3>
-        <p className="text-xs text-gray-500 mt-1">Este es el nombre que aparece en la factura como "Atendido por".</p>
+        <h3 className="font-display text-lg text-[var(--ink)]">Editar {perfil.rol === "admin" ? "nombre" : "asesor"}</h3>
+        <p className="text-xs text-gray-500 mt-1">El nombre aparece en la factura como "Atendido por".</p>
         <form onSubmit={submit} className="mt-4 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <input required placeholder="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)}
@@ -205,9 +225,21 @@ function EditarNombreModal({ perfil, onClose, onDone }: { perfil: Perfil; onClos
             <input placeholder="Apellido" value={apellido} onChange={(e) => setApellido(e.target.value)}
                    className="px-3 py-2.5 border border-[var(--line)] rounded-xl text-sm outline-none focus:border-[var(--gold)]" />
           </div>
+          {perfil.rol === "asesor" && (
+            <div>
+              <label className="text-[10px] uppercase tracking-[0.15em] text-gray-500 font-semibold mb-1.5 block">Frecuencia de pago de comisión</label>
+              <select value={frecuencia} onChange={(e) => setFrecuencia(e.target.value as Perfil["frecuencia_pago"])}
+                      className="w-full px-3 py-2.5 border border-[var(--line)] rounded-xl text-sm outline-none focus:border-[var(--gold)] bg-white">
+                <option value="semanal">Semanal</option>
+                <option value="quincenal">Quincenal</option>
+                <option value="mensual">Mensual</option>
+              </select>
+              <p className="text-[11px] text-gray-400 mt-1">Define qué rango de fechas se sugiere al pagarle su comisión en el módulo "Reportes asesores".</p>
+            </div>
+          )}
           {err && <div className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</div>}
           <button disabled={busy} className="zi-btn-gold w-full text-sm disabled:opacity-60">
-            {busy ? "Guardando..." : "Guardar nombre"}
+            {busy ? "Guardando..." : "Guardar cambios"}
           </button>
         </form>
       </div>
