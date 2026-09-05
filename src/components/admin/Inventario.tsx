@@ -30,7 +30,7 @@ function emptyP(): Producto {
   return {
     id: "", nombre: "", categoria: "iphone", descripcion: "", estado: "nuevo",
     colores: [], imagen: "", precio: 0, costo: 0, stock: 1, local: 1,
-    proveedor: "", imei: "", costoOrigen: "capital_aparte", creadoEn: Date.now(),
+    imei: "", costoOrigen: "capital_aparte", creadoEn: Date.now(),
   };
 }
 
@@ -197,7 +197,6 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
 
       <h4 className="text-xs uppercase tracking-widest text-gray-500 border-b border-[var(--line)] pb-2 mt-4">Info de compra</h4>
       <div className="grid md:grid-cols-2 gap-3">
-        <Field label="Proveedor"><Input value={value.proveedor || ""} onChange={e => onChange({ ...value, proveedor: e.target.value })} /></Field>
         <Field label="Costo de compra"><Input type="number" value={value.costo} onChange={e => onChange({ ...value, costo: +e.target.value || 0 })} /></Field>
         {showImei && (
           <Field label="📱 IMEI / Serial"><Input value={value.imei || ""} onChange={e => onChange({ ...value, imei: e.target.value })} /></Field>
