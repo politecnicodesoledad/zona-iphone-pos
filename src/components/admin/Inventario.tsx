@@ -30,7 +30,7 @@ function emptyP(): Producto {
   return {
     id: "", nombre: "", categoria: "iphone", descripcion: "", estado: "nuevo",
     colores: [], imagen: "", precio: 0, costo: 0, stock: 1, local: 1,
-    proveedor: "", imei: "", costoOrigen: "capital_aparte", creadoEn: Date.now(),
+    imei: "", costoOrigen: "capital_aparte", creadoEn: Date.now(),
   };
 }
 
@@ -109,13 +109,13 @@ function ProductosTab({ modo }: { modo: "productos" | "accesorios" }) {
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing?.id ? "Editar producto" : "Agregar producto"} size="xl">
-        {editing && <ProductForm value={editing} onChange={setEditing} onSave={save} hideImei={modo === "accesorios"} />}
+        {editing && <ProductForm value={editing} onChange={setEditing} onSave={save} />}
       </Modal>
     </div>
   );
 }
 
-function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; onChange: (p: Producto) => void; onSave: (p: Producto) => void; hideImei?: boolean }) {
+function ProductForm({ value, onChange, onSave }: { value: Producto; onChange: (p: Producto) => void; onSave: (p: Producto) => void }) {
   const [cfg] = useConfig();
   const [imageMode, setImageMode] = useState<"galeria" | "link" | "archivo">("galeria");
   const [galleryQ, setGalleryQ] = useState(value.nombre || "");
@@ -123,7 +123,6 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
   const [newImg, setNewImg] = useState({ modelo: "", color: "", url: "" });
   const ganancia = value.precio - value.costo;
   const margen = value.precio > 0 ? (ganancia / value.precio) * 100 : 0;
-  const showImei = !hideImei && ["iphone", "ipad", "macbook"].includes(value.categoria);
   const galleryItems = [...customGallery, ...GALERIA_IPHONE].filter(g => `${g.modelo} ${g.color}`.toLowerCase().includes(galleryQ.toLowerCase())).slice(0, 24);
 
   useEffect(() => { pullCustomGallery().then(setCustomGallery); }, []);
@@ -197,11 +196,10 @@ function ProductForm({ value, onChange, onSave, hideImei }: { value: Producto; o
 
       <h4 className="text-xs uppercase tracking-widest text-gray-500 border-b border-[var(--line)] pb-2 mt-4">Info de compra</h4>
       <div className="grid md:grid-cols-2 gap-3">
-        <Field label="Proveedor"><Input value={value.proveedor || ""} onChange={e => onChange({ ...value, proveedor: e.target.value })} /></Field>
         <Field label="Costo de compra"><Input type="number" value={value.costo} onChange={e => onChange({ ...value, costo: +e.target.value || 0 })} /></Field>
-        {showImei && (
-          <Field label="📱 IMEI / Serial"><Input value={value.imei || ""} onChange={e => onChange({ ...value, imei: e.target.value })} /></Field>
-        )}
+        <Field label="Código de barras / Serial (opcional)">
+          <Input value={value.imei || ""} onChange={e => onChange({ ...value, imei: e.target.value })} placeholder="Escanea o escribe el código..." />
+        </Field>
         <Field label="Origen del costo">
           <Select value={value.costoOrigen} onChange={e => onChange({ ...value, costoOrigen: e.target.value as CostoOrigen })}>
             <option value="capital_aparte">📦 Capital aparte (no afecta ganancias)</option>

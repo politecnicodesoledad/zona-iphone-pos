@@ -1,21 +1,25 @@
 import { useState, useEffect } from "react";
-import { BarChart3, ShoppingBag, Wallet, Package, Users, Settings, LogOut, Menu, ReceiptText } from "lucide-react";
+import { BarChart3, ShoppingBag, Wallet, Package, Users, Settings, LogOut, Menu, ReceiptText, UserCog, Award } from "lucide-react";
 import { useSession, useConfig, useFacturaNum } from "@/lib/zi/store";
 import { fmtFactura } from "@/lib/zi/store";
 import { Ganancias } from "./Ganancias";
 import { NuevaVenta } from "./NuevaVenta";
 import { Finanzas, Gastos } from "./Finanzas";
 import { Inventario } from "./Inventario";
-import { ClientesEmpleados } from "./ClientesEmpleados";
+import { Clientes } from "./Clientes";
 import { Configuracion } from "./Configuracion";
+import { Usuarios } from "./Usuarios";
+import { Comisiones } from "./Comisiones";
+import { MiDesempeno } from "./MiDesempeno";
+import { ProductosAsesor } from "./StockAsesor";
 
-type Mod = "ganancias" | "venta" | "movimientos" | "gastos" | "inventario" | "clientes" | "config";
+type Mod = "ganancias" | "mirendimiento" | "venta" | "movimientos" | "gastos" | "inventario" | "productos" | "clientes" | "usuarios" | "comisiones" | "config";
 
 export function AdminShell() {
-  const { logout } = useSession();
+  const { logout, profile, isAdmin } = useSession();
   const [cfg] = useConfig();
   const [num] = useFacturaNum();
-  const [mod, setMod] = useState<Mod>("ganancias");
+  const [mod, setMod] = useState<Mod>(isAdmin ? "ganancias" : "mirendimiento");
   const [open, setOpen] = useState(false);
   const [clock, setClock] = useState("");
 
@@ -27,23 +31,34 @@ export function AdminShell() {
     t(); const i = setInterval(t, 30000); return () => clearInterval(i);
   }, []);
 
+  // Cada asesor entra a su propio panel: solo ve lo necesario para vender.
+  // Ganancias, Gastos, Inventario y Configuración son exclusivos de ADMIN
+  // (esto es solo la navegación — el bloqueo real de datos está en RLS).
   const items: { id: Mod; icon: typeof BarChart3; label: string; badge?: string }[] = [
-    { id: "ganancias", icon: BarChart3, label: "Ganancias" },
+    ...(isAdmin ? [{ id: "ganancias" as Mod, icon: BarChart3, label: "Ganancias" }] : []),
+    ...(!isAdmin ? [{ id: "mirendimiento" as Mod, icon: Award, label: "Mi rendimiento" }] : []),
     { id: "venta", icon: ShoppingBag, label: "Nueva venta", badge: fmtFactura(num) },
+    ...(!isAdmin ? [{ id: "productos" as Mod, icon: Package, label: "Stock" }] : []),
     { id: "movimientos", icon: Wallet, label: "Movimientos" },
-    { id: "gastos", icon: ReceiptText, label: "Gastos" },
-    { id: "inventario", icon: Package, label: "Inventario" },
+    ...(isAdmin ? [{ id: "gastos" as Mod, icon: ReceiptText, label: "Gastos" }] : []),
+    ...(isAdmin ? [{ id: "inventario" as Mod, icon: Package, label: "Inventario" }] : []),
     { id: "clientes", icon: Users, label: "Clientes" },
-    { id: "config", icon: Settings, label: "Configuración" },
+    ...(isAdmin ? [{ id: "usuarios" as Mod, icon: UserCog, label: "Usuarios" }] : []),
+    ...(isAdmin ? [{ id: "comisiones" as Mod, icon: Award, label: "Reportes asesores" }] : []),
+    ...(isAdmin ? [{ id: "config" as Mod, icon: Settings, label: "Configuración" }] : []),
   ];
 
   const TITLES: Record<Mod, string> = {
     ganancias: "Resumen de ganancias",
+    mirendimiento: "Mi rendimiento",
     venta: "Registrar nueva venta",
     movimientos: "Movimientos e historial",
     gastos: "Gastos operativos",
     inventario: "Inventario",
-    clientes: "Clientes y empleados",
+    productos: "Stock disponible",
+    clientes: "Clientes",
+    usuarios: "Usuarios y asesores",
+    comisiones: "Reportes de asesores",
     config: "Configuración",
   };
 
@@ -53,7 +68,9 @@ export function AdminShell() {
         <img src={cfg.logoUrl} alt="" className="w-11 h-11 rounded-xl bg-[var(--cream)] p-1 border border-[var(--line)]" />
         <div className="leading-tight">
           <div className="font-display text-xl text-[var(--ink)]">{cfg.storeName}</div>
-          <div className="text-[9px] text-[var(--gold-dark)] font-bold tracking-[0.2em] uppercase">Panel admin</div>
+          <div className="text-[9px] text-[var(--gold-dark)] font-bold tracking-[0.2em] uppercase">
+            {isAdmin ? "Panel admin" : "Panel asesor"}
+          </div>
         </div>
       </div>
       <nav className="flex-1 p-3 space-y-1">
@@ -75,7 +92,11 @@ export function AdminShell() {
           );
         })}
       </nav>
-      <button onClick={logout} className="m-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-2 border border-[var(--line)] transition">
+      <div className="mx-3 mb-2 px-3 py-2 rounded-xl bg-[var(--mist)] text-[11px] text-gray-500 leading-tight">
+        <div className="font-semibold text-[var(--ink)] truncate">{profile?.nombre} {profile?.apellido}</div>
+        <div className="truncate">{profile?.email}</div>
+      </div>
+      <button onClick={logout} className="m-3 mt-0 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-2 border border-[var(--line)] transition">
         <LogOut className="w-4 h-4" /> Cerrar sesión
       </button>
     </aside>
@@ -107,13 +128,17 @@ export function AdminShell() {
         </header>
         <main className="flex-1 overflow-auto p-5 md:p-7 scrollbar-thin">
           <div className="max-w-[1400px] mx-auto">
-            {mod === "ganancias" && <Ganancias />}
+            {mod === "ganancias" && isAdmin && <Ganancias />}
+            {mod === "mirendimiento" && !isAdmin && <MiDesempeno />}
             {mod === "venta" && <NuevaVenta />}
             {mod === "movimientos" && <Finanzas />}
-            {mod === "gastos" && <Gastos />}
-            {mod === "inventario" && <Inventario />}
-            {mod === "clientes" && <ClientesEmpleados />}
-            {mod === "config" && <Configuracion />}
+            {mod === "gastos" && isAdmin && <Gastos />}
+            {mod === "inventario" && isAdmin && <Inventario />}
+            {mod === "productos" && !isAdmin && <ProductosAsesor />}
+            {mod === "clientes" && <Clientes />}
+            {mod === "usuarios" && isAdmin && <Usuarios />}
+            {mod === "comisiones" && isAdmin && <Comisiones />}
+            {mod === "config" && isAdmin && <Configuracion />}
           </div>
         </main>
       </div>

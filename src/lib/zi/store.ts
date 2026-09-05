@@ -1,8 +1,23 @@
-import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
+import { useEffect, useCallback, useSyncExternalStore } from "react";
 import type {
   Producto, Venta, Gasto, ClienteCRM, Proveedor, Empleado,
   ProductoVendido, ZIConfig,
 } from "./types";
+import { ziSupabase } from "@/integrations/supabase/zi-client";
+import type { Session } from "@supabase/supabase-js";
+
+export type Perfil = {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  rol: "admin" | "asesor";
+  activo: boolean;
+  comision_pct: number;
+  frecuencia_pago: "semanal" | "quincenal" | "mensual";
+  creado_en: string;
+};
 
 const KEYS = {
   config: "zi_config",
@@ -158,9 +173,20 @@ export function useCloudBoot() {
     if (cloudRuntimeStarted) return;
     cloudRuntimeStarted = true;
     cloudBooted = true;
-    const sync = () => import("./cloud-sync")
-      .then(async ({ pullAllFromCloud, pushAllToCloud }) => { await pullAllFromCloud({ merge: true, silent: true }); await pushAllToCloud(); })
-      .then(() => emit()).catch(() => {});
+    let syncing = false;
+    const sync = () => {
+      // Si la sincronización anterior todavía no ha terminado (por ejemplo,
+      // por una red lenta), no lanzamos otra encima — eso es justo lo que
+      // antes podía ir tapando las conexiones del navegador hasta que todo
+      // (incluido el login) se quedaba esperando para siempre.
+      if (syncing) return;
+      syncing = true;
+      import("./cloud-sync")
+        .then(async ({ pullAllFromCloud, pushAllToCloud }) => { await pullAllFromCloud({ merge: true, silent: true }); await pushAllToCloud(); })
+        .then(() => emit())
+        .catch(() => {})
+        .finally(() => { syncing = false; });
+    };
     sync();
     const i = window.setInterval(sync, 15000);
     const onFocus = () => sync();
@@ -206,28 +232,169 @@ export const Store = {
   setFacturaNum: (v: number) => { write(KEYS.facturaNum, v); queueCloudSync(KEYS.facturaNum, v); emit(); },
 };
 
-// Session
+// Session — autenticación real con Supabase Auth + rol desde zi_perfiles.
+// Ya no existe un usuario/contraseña compartido: cada quien entra con su cuenta.
+//
+// IMPORTANTE: este estado es un SINGLETON a nivel de módulo, no un useState
+// normal dentro del hook. Antes, cada componente que llamaba useSession()
+// (AdminPage, AdminShell, NuevaVenta, Finanzas, MiDesempeno, AdminLogin...)
+// arrancaba su PROPIA copia de session/profile/loading y hacía su PROPIA
+// llamada a getSession()/zi_perfiles por separado. Como esas llamadas no
+// terminan exactamente al mismo tiempo, un componente podía quedar un
+// instante con profile=null mientras otro ya lo tenía cargado: eso es lo que
+// causaba el parpadeo a "Mi rendimiento" (porque en ese instante isAdmin
+// salía false) y el rebote al login (porque en ese instante authed salía
+// false). Con un solo estado compartido, todos los componentes se actualizan
+// exactamente al mismo tiempo, con el mismo valor — el parpadeo desaparece.
+let ziSessionState = {
+  session: null as Session | null,
+  profile: null as Perfil | null,
+  loading: true,
+};
+const sessionListeners = new Set<() => void>();
+function emitSession() { sessionListeners.forEach((l) => l()); }
+function setSessionState(patch: Partial<typeof ziSessionState>) {
+  ziSessionState = { ...ziSessionState, ...patch };
+  emitSession();
+}
+
+let sessionInitStarted = false;
+let profileFetchToken = 0; // evita que una respuesta vieja pise una más nueva
+
+// Corta cualquier promesa que se quede colgada más de `ms` — en vez de dejar
+// la UI esperando para siempre (lo que pasaba en el MacBook: el botón se
+// quedaba en "Entrando..." sin fin si alguna llamada de red nunca resolvía).
+export function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Tiempo de espera agotado: ${label}`)), ms);
+    Promise.resolve(promise).then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
+async function fetchPerfil(userId: string): Promise<Perfil | null> {
+  try {
+    const { data, error } = await withTimeout(
+      ziSupabase.from("zi_perfiles").select("*").eq("id", userId).maybeSingle(),
+      12000, "carga de perfil"
+    );
+    if (error) { console.error("zi_perfiles:", error.message); return null; }
+    return (data as Perfil) ?? null;
+  } catch (e) {
+    // Puede fallar por red, por bloqueo del navegador (p. ej. Safari/macOS con
+    // rastreo estricto), o por quedarse colgada: nunca dejamos que esto
+    // reviente hacia arriba. login() siempre debe poder terminar.
+    console.error("zi_perfiles (excepción):", e);
+    return null;
+  }
+}
+
+async function loadProfileSingleton(userId: string) {
+  const myToken = ++profileFetchToken;
+  const perfil = await fetchPerfil(userId);
+  if (myToken !== profileFetchToken) return; // llegó una petición más nueva después: ignorar esta
+  setSessionState({ profile: perfil });
+}
+
+function initSessionOnce() {
+  if (sessionInitStarted) return;
+  sessionInitStarted = true;
+  ziSupabase.auth.getSession().then(({ data }) => {
+    setSessionState({ session: data.session, loading: false });
+    if (data.session) loadProfileSingleton(data.session.user.id);
+  });
+  ziSupabase.auth.onAuthStateChange((_event, sess) => {
+    setSessionState({ session: sess, loading: false });
+    if (sess) loadProfileSingleton(sess.user.id);
+    else { profileFetchToken++; setSessionState({ profile: null }); }
+  });
+}
+
 export function useSession() {
-  const [authed, setAuthed] = useState(() =>
-    typeof sessionStorage !== "undefined" && sessionStorage.getItem("zi_session") === "1");
-  useEffect(() => {
-    const handler = () => setAuthed(sessionStorage.getItem("zi_session") === "1");
-    window.addEventListener("zi-session", handler);
-    return () => window.removeEventListener("zi-session", handler);
+  const subscribe = useCallback((cb: () => void) => {
+    initSessionOnce();
+    sessionListeners.add(cb);
+    return () => { sessionListeners.delete(cb); };
   }, []);
-  const login = (pw: string) => {
-    if (pw === Store.config().adminPassword) {
-      sessionStorage.setItem("zi_session", "1");
-      window.dispatchEvent(new Event("zi-session"));
-      return true;
+  const getSnapshot = useCallback(() => ziSessionState, []);
+  const state = useSyncExternalStore(subscribe, getSnapshot, () => ziSessionState);
+
+  const login = useCallback(async (identificador: string, password: string) => {
+    try {
+      let email = identificador.trim();
+
+      // Si no parece un correo, es "Nombre Apellido": hay que resolverlo a
+      // un correo real antes de poder llamar a signInWithPassword (Supabase
+      // Auth siempre necesita un correo por debajo).
+      if (!email.includes("@")) {
+        const { data: resuelto, error: errResolver } = await withTimeout(
+          ziSupabase.rpc("zi_resolver_login", { identificador: email }),
+          10000, "búsqueda de usuario"
+        );
+        if (errResolver) return { ok: false as const, error: "No se pudo buscar ese usuario. Intenta con tu correo." };
+        if (!resuelto) return { ok: false as const, error: "No encontramos a nadie activo con ese nombre exacto. Verifica cómo está escrito o usa tu correo." };
+        email = resuelto as string;
+      }
+
+      const { data, error } = await withTimeout(
+        ziSupabase.auth.signInWithPassword({ email, password }),
+        15000, "inicio de sesión"
+      );
+      if (error || !data.session) return { ok: false as const, error: "Correo o contraseña incorrectos" };
+
+      profileFetchToken++; // invalida cualquier fetch de perfil que ya estuviera en vuelo
+      const myToken = profileFetchToken;
+
+      // Justo después de signInWithPassword, la sesión nueva a veces tarda un
+      // instante en quedar disponible para las consultas a Postgrest. Si la
+      // primera lectura de zi_perfiles viene vacía, NO asumimos "inactivo":
+      // reintentamos una vez antes de sacar cualquier conclusión. Antes, ese
+      // vacío transitorio se interpretaba como "usuario inactivo" y te cerraba
+      // la sesión a ti mismo siendo admin activo.
+      let perfil = await fetchPerfil(data.session.user.id);
+      if (!perfil) {
+        await new Promise((r) => setTimeout(r, 500));
+        perfil = await fetchPerfil(data.session.user.id);
+      }
+
+      if (myToken !== profileFetchToken) return { ok: true as const }; // otra sesión más nueva ya tomó el control
+
+      if (!perfil) {
+        // No se pudo confirmar el perfil tras dos intentos: puede ser un
+        // problema de red o de RLS, pero NO sabemos que esté inactivo, así que
+        // no cerramos la sesión ni acusamos al usuario de estar desactivado.
+        setSessionState({ session: data.session, loading: false });
+        return { ok: false as const, error: "No se pudo verificar tu perfil. Intenta iniciar sesión de nuevo en unos segundos." };
+      }
+
+      if (!perfil.activo) {
+        await ziSupabase.auth.signOut();
+        return { ok: false as const, error: "Usuario inactivo. Contacta al administrador." };
+      }
+
+      setSessionState({ session: data.session, profile: perfil, loading: false });
+      return { ok: true as const };
+    } catch (e) {
+      // Red de la persona a la que le está pasando esto o el navegador
+      // bloqueó/cortó alguna petición: nunca dejamos el login "colgado".
+      console.error("login():", e);
+      return { ok: false as const, error: "No se pudo conectar. Revisa tu internet e intenta de nuevo." };
     }
-    return false;
+  }, []);
+
+  const logout = useCallback(async () => {
+    await ziSupabase.auth.signOut();
+    profileFetchToken++;
+    setSessionState({ session: null, profile: null });
+  }, []);
+
+  return {
+    authed: !!state.session && !!state.profile,
+    loading: state.loading,
+    profile: state.profile,
+    isAdmin: state.profile?.rol === "admin",
+    login,
+    logout,
   };
-  const logout = () => {
-    sessionStorage.removeItem("zi_session");
-    window.dispatchEvent(new Event("zi-session"));
-  };
-  return { authed, login, logout };
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);

@@ -1,42 +1,100 @@
-import { useState, useMemo } from "react";
-import { useProductos, useOtros, useVentas, useClientes, useFacturaNum, useConfig, useVendidos, Store, uid, fmtFactura } from "@/lib/zi/store";
+import { useState, useMemo, useEffect } from "react";
+import { useProductos, useOtros, useVentas, useFacturaNum, useConfig, useVendidos, useSession, Store, uid, fmtFactura } from "@/lib/zi/store";
 import { fmtCOP } from "@/lib/zi/format";
+import { buscarClienteExistente } from "@/lib/zi/clientes";
 import { facturaWhatsappText, generarFacturaPDF } from "@/lib/zi/pdf";
-import { Card, Btn, Input, Select, Textarea, Tabs, Field, DateTriple } from "./ui";
+import { Card, Btn, Input, Select, Textarea, Field } from "./ui";
 import type { VentaProducto, Venta, Producto } from "@/lib/zi/types";
-import { Trash2, Search, Plus, MessageCircle } from "lucide-react";
+import { Trash2, Search, Plus, MessageCircle, ChevronDown, ShieldCheck } from "lucide-react";
 
 interface Item extends VentaProducto { id: string; precioBase: number; }
+
+// Sección compacta y colapsable — todo lo que no se esté usando queda oculto.
+function Section({ title, subtitle, defaultOpen = true, children }: { title: string; subtitle?: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left">
+        <div>
+          <h3 className="font-display text-lg text-[var(--ink)] leading-none">{title}</h3>
+          {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="px-5 pb-5 pt-1 border-t border-[var(--line)]">{children}</div>}
+    </Card>
+  );
+}
+
+function Checkbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--line)] bg-white text-sm font-medium text-gray-600 cursor-pointer hover:border-[var(--gold)] has-[:checked]:border-[var(--gold)] has-[:checked]:bg-[var(--cream)] has-[:checked]:text-[var(--ink)] transition">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="accent-[var(--gold-dark)]" />
+      {label}
+    </label>
+  );
+}
 
 export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [productos] = useProductos();
   const [otros] = useOtros();
-  const [, setVentas] = useVentas();
-  const [, setClientes] = useClientes();
+  const [ventasExistentes, setVentas] = useVentas();
   const [num, setNum] = useFacturaNum();
   const [cfg] = useConfig();
+  const { profile } = useSession();
 
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<string>("todos");
   const [selectedId, setSelectedId] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Datos adicionales — solo aparecen cuando el usuario los selecciona.
+  const [showImei, setShowImei] = useState(false);
+  const [showCedula, setShowCedula] = useState(false);
+  const [showCelular, setShowCelular] = useState(false);
+  const [showDireccion, setShowDireccion] = useState(false);
+  const [showRapida, setShowRapida] = useState(false);
+
+  const [imei, setImei] = useState("");
+  const [cNombre, setCNombre] = useState("");
+  const [cCedula, setCCedula] = useState("");
+  const [cTel, setCTel] = useState("");
+  const [cDireccion, setCDireccion] = useState("");
+
+  // Reconocer cliente recurrente: en cuanto la cédula o el celular escritos
+  // coinciden con una venta anterior, avisamos quién es y desde cuándo
+  // compra — sin esto, cada venta se veía "nueva" aunque fuera la persona
+  // de siempre. La regla de "quién es quién" es la misma que usa la
+  // pantalla "Clientes", así que apenas guardas esta venta, cae
+  // automáticamente bajo el mismo historial.
+  const clienteExistente = useMemo(() => {
+    if (cCedula.trim().length < 5 && cTel.trim().length < 7) return null;
+    return buscarClienteExistente(ventasExistentes, { cedula: cCedula, telefono: cTel });
+  }, [ventasExistentes, cCedula, cTel]);
+
+  function usarDatosCliente() {
+    if (!clienteExistente) return;
+    setCNombre(clienteExistente.nombre);
+    if (showDireccion && clienteExistente.direccion) setCDireccion(clienteExistente.direccion);
+  }
+
   const [quickNombre, setQuickNombre] = useState("");
   const [quickCosto, setQuickCosto] = useState(0);
   const [quickPrecio, setQuickPrecio] = useState(0);
   const [quickStock, setQuickStock] = useState(1);
+
   const [tipoPago, setTipoPago] = useState<"contado" | "credito" | "tradein">("contado");
+  const [empresaCredito, setEmpresaCredito] = useState("");
   const [metodo, setMetodo] = useState<"efectivo" | "nequi" | "transferencia" | "datafono">("efectivo");
   const [recibido, setRecibido] = useState(0);
-  const [asesor, setAsesor] = useState("");
+  const [descuentoOrden, setDescuentoOrden] = useState(0);
   const [local, setLocal] = useState<1 | 2>(1);
-  // credito
-  const [cNombre, setCNombre] = useState("");
-  const [cCedula, setCCedula] = useState("");
-  const [cTel, setCTel] = useState("");
+
+  // crédito (cuotas)
   const [cInicial, setCInicial] = useState(0);
   const [cCuotas, setCCuotas] = useState(3);
-  // tradein
+  // celular como parte de pago
   const [tMarca, setTMarca] = useState("");
   const [tModelo, setTModelo] = useState("");
   const [tImei, setTImei] = useState("");
@@ -44,7 +102,7 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const [tMetodo, setTMetodo] = useState<"efectivo" | "nequi" | "transferencia" | "datafono">("efectivo");
 
   const [obs, setObs] = useState("");
-  const [garantia, setGarantia] = useState("");
+  const [garantiaMeses, setGarantiaMeses] = useState<0 | 6 | 12>(0);
   const [ultimaVenta, setUltima] = useState<Venta | null>(null);
   const [fechaFactura, setFechaFactura] = useState(() => new Date().toISOString().slice(0, 16));
   const [pinFecha, setPinFecha] = useState("");
@@ -57,13 +115,34 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   const matches = useMemo(() => {
     let base = disponibles;
     if (catFilter !== "todos") base = base.filter(p => p.categoria === catFilter);
-    if (search) base = base.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()));
+    if (search) {
+      const s = search.trim().toLowerCase();
+      base = base.filter(p => p.nombre.toLowerCase().includes(s) || (p.imei || "").toLowerCase().includes(s));
+    }
     return base.slice(0, 100);
   }, [disponibles, search, catFilter]);
-  const total = items.reduce((s, i) => s + i.subtotal, 0);
-  const descuentoTotal = items.reduce((s, i) => s + (i.descuento || 0), 0);
+
+  // Si el texto escaneado/escrito coincide EXACTO con el serial de un solo
+  // producto (así es como trabaja un lector de código de barras: escribe el
+  // código completo y manda Enter), lo seleccionamos de una vez — sin esto,
+  // había que además abrir el desplegable y buscarlo manualmente.
+  useEffect(() => {
+    const s = search.trim().toLowerCase();
+    if (s.length < 4) return;
+    const exactos = disponibles.filter(p => (p.imei || "").toLowerCase() === s);
+    if (exactos.length === 1) setSelectedId(exactos[0].id);
+  }, [search, disponibles]);
+
+  const itemsTotal = items.reduce((s, i) => s + i.subtotal, 0);
+  const descuentoItems = items.reduce((s, i) => s + (i.descuento || 0), 0);
+  const total = Math.max(0, itemsTotal - descuentoOrden);
+  const cambio = Math.max(0, recibido - total);
+  const faltante = Math.max(0, total - recibido);
   const cValorCuota = cCuotas > 0 ? (total - cInicial) / cCuotas : 0;
   const tRestante = total - tValor;
+  const vencimientoPreview = garantiaMeses > 0
+    ? new Date(new Date().setMonth(new Date().getMonth() + garantiaMeses)).toLocaleDateString("es-CO")
+    : null;
 
   function add(p: Producto) {
     const already = items.filter(i => i.productoId === p.id).reduce((s, i) => s + i.cantidad, 0);
@@ -102,9 +181,11 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   async function finalizar() {
     if (saving) return;
     if (items.length === 0) { alert("Agrega al menos un producto"); return; }
+    if (!profile) { alert("No se detectó tu sesión. Vuelve a iniciar sesión."); return; }
+    if (!cNombre.trim()) { alert("El nombre del cliente es obligatorio."); return; }
     const requiereCliente = tipoPago === "credito" || tipoPago === "tradein";
     if (requiereCliente && (!cNombre.trim() || !cTel.trim() || !cCedula.trim())) {
-      alert("Para crédito o celular como parte de pago debes registrar nombre, teléfono y cédula."); return;
+      alert("Para crédito o celular como parte de pago debes registrar nombre, teléfono y cédula del cliente."); return;
     }
     if (retroMode && pinFecha !== "0011") { alert("PIN incorrecto para registrar venta con fecha manual"); return; }
     const fechaVenta = retroMode ? new Date(fechaFactura).getTime() : Date.now();
@@ -121,18 +202,33 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
       facturaNum = num;
     }
     const factura = fmtFactura(facturaNum);
+    const garantiaVencimiento = garantiaMeses > 0
+      ? new Date(new Date(fechaVenta).setMonth(new Date(fechaVenta).getMonth() + garantiaMeses)).getTime()
+      : undefined;
+    const nombreAsesor = `${profile.nombre} ${profile.apellido}`.trim();
     const venta: Venta = {
-      id: uid(), factura, fecha: fechaVenta, registradaEn: Date.now(), fechaManual: retroMode, tipo: tipoPago, local, asesor,
+      id: uid(), factura, fecha: fechaVenta, registradaEn: Date.now(), fechaManual: retroMode,
+      tipo: tipoPago, local,
+      asesor: nombreAsesor, asesorId: profile.id,
       productos: items.map(({ id: _id, precioBase: _pb, ...rest }) => rest),
-      total, descuentoTotal, observaciones: obs, garantia: garantia.trim() || cfg.facturaGarantia,
-      ...((cNombre || cTel || cCedula) && { cliente: { nombre: cNombre.trim(), cedula: cCedula.trim(), telefono: cTel.trim() } }),
+      total, descuentoTotal: descuentoItems, descuentoOrden,
+      observaciones: obs, garantia: cfg.facturaGarantia,
+      garantiaMeses: garantiaMeses || undefined, garantiaVencimiento,
+      ...(showImei && imei.trim() && { imei: imei.trim() }),
+      cliente: {
+        nombre: cNombre.trim(),
+        ...(showCedula && { cedula: cCedula.trim() }),
+        ...(showCelular && { telefono: cTel.trim() }),
+        ...(showDireccion && { direccion: cDireccion.trim() }),
+      },
       ...(tipoPago === "contado" && { metodoPago: metodo, recibido }),
       ...(tipoPago === "credito" && {
-        cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel },
+        cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel, ...(showDireccion && { direccion: cDireccion }) },
+        empresaCredito: empresaCredito.trim() || undefined,
         creditoCuotas: cCuotas, creditoCuotaInicial: cInicial, creditoValorCuota: cValorCuota,
       }),
       ...(tipoPago === "tradein" && {
-        cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel },
+        cliente: { nombre: cNombre, cedula: cCedula, telefono: cTel, ...(showDireccion && { direccion: cDireccion }) },
         tradeIn: { marca: tMarca, modelo: tModelo, imei: tImei, valor: tValor, restante: tRestante, metodoRestante: tMetodo },
       }),
     };
@@ -182,30 +278,13 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
 
     setVentas(prev => [...prev, venta]);
     setNum(Math.max(num, facturaNum) + 1);
-
-    // CRM crédito
-    if (tipoPago === "credito" && cNombre) {
-      const cuotas = Array.from({ length: cCuotas }, (_, i) => ({
-        numero: i + 1,
-        fechaPago: Date.now() + (i + 1) * 30 * 86400000,
-        monto: cValorCuota,
-        estado: "pendiente" as const,
-      }));
-      setClientes(prev => [...prev, {
-        id: uid(), nombre: cNombre, cedula: cCedula, telefono: cTel,
-        producto: items.map(i => i.nombre).join(", "),
-        total, cuotaInicial: cInicial, cuotas: cCuotas, cuotasPagadas: 0,
-        valorCuota: cValorCuota, estado: "al_dia",
-        proximoPago: Date.now() + 30 * 86400000,
-        cuotasDetalle: cuotas, historialAbonos: [{ fecha: Date.now(), monto: cInicial, nota: "Cuota inicial" }],
-        ventaId: venta.id,
-      }]);
-    }
     setUltima(venta);
     // reset
-    setItems([]); setObs(""); setGarantia(""); setRecibido(0); setPinFecha(""); setFechaFactura(new Date().toISOString().slice(0, 16));
-    setCNombre(""); setCCedula(""); setCTel(""); setCInicial(0); setCCuotas(3);
+    setItems([]); setObs(""); setGarantiaMeses(0); setRecibido(0); setPinFecha(""); setFechaFactura(new Date().toISOString().slice(0, 16));
+    setCNombre(""); setCCedula(""); setCTel(""); setCDireccion(""); setImei(""); setDescuentoOrden(0); setEmpresaCredito("");
+    setCInicial(0); setCCuotas(3);
     setTMarca(""); setTModelo(""); setTImei(""); setTValor(0);
+    setShowImei(false); setShowCedula(false); setShowCelular(false); setShowDireccion(false); setShowRapida(false);
     alert(`Venta ${factura} guardada ✓`);
     setSaving(false);
   }
@@ -219,7 +298,6 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
     const phone = (ultimaVenta.cliente?.telefono || cfg.whatsapp).replace(/\D/g, "");
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(facturaWhatsappText(ultimaVenta, cfg))}`, "_blank");
   }
-
   function cancelar() {
     const pin = prompt("PIN de cancelación (4 dígitos):");
     if (pin !== cfg.cancelPin) return alert("PIN incorrecto");
@@ -227,9 +305,9 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
   }
 
   return (
-    <div className="grid lg:grid-cols-[1fr_380px] gap-4">
-      <div className="space-y-4">
-        <Card>
+    <div className="grid lg:grid-cols-[1fr_360px] gap-4">
+      <div className="space-y-3">
+        <Section title="1. Productos" subtitle={`${items.length} en el carrito`}>
           <div className="grid md:grid-cols-2 gap-3">
             <Field label="Categoría">
               <Select value={catFilter} onChange={e => { setCatFilter(e.target.value); setSelectedId(""); }}>
@@ -244,60 +322,38 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
             <Field label="Buscar producto">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del producto..." className="pl-9" />
+                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre o escanea el código de barras..." className="pl-9" />
               </div>
             </Field>
           </div>
+
           <div className="mt-3 grid md:grid-cols-[1fr_auto] gap-2 items-end">
-            <Field label={`Producto (${matches.length} disponibles) — puedes agregar varios distintos`}>
+            <Field label={`Producto (${matches.length} disponibles)`}>
               <Select value={selectedId} onChange={e => setSelectedId(e.target.value)}>
                 <option value="">Selecciona un producto...</option>
                 {matches.map(p => <option key={p.id} value={p.id}>{p.nombre} · {p.stock} disp. · {fmtCOP(p.precio)}</option>)}
               </Select>
             </Field>
-            <Btn type="button" variant="ink" onClick={addSelected} className="h-10"><Plus className="w-4 h-4 inline" /> Agregar al carrito</Btn>
+            <Btn type="button" variant="ink" onClick={addSelected} className="h-10"><Plus className="w-4 h-4 inline" /> Agregar</Btn>
           </div>
-          <p className="text-[11px] text-gray-500 mt-2">💡 Puedes agregar varios productos distintos a la misma factura seleccionándolos uno por uno.</p>
-        </Card>
 
-        <Card>
-          <h3 className="font-display text-xl text-[var(--gold)] mb-3">Datos del cliente</h3>
-          <div className="grid md:grid-cols-3 gap-3">
-            <Field label={tipoPago === "contado" ? "Nombre (opcional)" : "Nombre (obligatorio)"}><Input value={cNombre} onChange={e => setCNombre(e.target.value)} placeholder="Nombre del cliente" /></Field>
-            <Field label={tipoPago === "contado" ? "Teléfono (opcional)" : "Teléfono (obligatorio)"}><Input value={cTel} onChange={e => setCTel(e.target.value.replace(/\D/g,""))} placeholder="300..." /></Field>
-            <Field label={tipoPago === "contado" ? "Cédula (opcional)" : "Cédula (obligatoria)"}><Input value={cCedula} onChange={e => setCCedula(e.target.value.replace(/\D/g,""))} placeholder="CC / NIT" /></Field>
+          <div className="mt-3">
+            <Checkbox label="Venta rápida (producto sin inventario)" checked={showRapida} onChange={setShowRapida} />
           </div>
-        </Card>
-
-        {retroMode && (
-          <Card className="border-amber-200 bg-amber-50">
-            <h3 className="font-display text-xl text-amber-900 mb-3">Venta con fecha manual</h3>
-            <div className="grid md:grid-cols-2 gap-3">
-              <Field label="Fecha real (mes / día / año)"><DateTriple value={fechaFactura.slice(0, 10)} onChange={v => setFechaFactura(`${v}${fechaFactura.slice(10) || "T12:00"}`)} /></Field>
-              <Field label="Hora"><Input type="time" value={(fechaFactura.split("T")[1] || "12:00").slice(0, 5)} onChange={e => setFechaFactura(`${fechaFactura.slice(0, 10)}T${e.target.value}`)} /></Field>
-              <Field label="PIN requerido"><Input type="password" maxLength={4} value={pinFecha} onChange={e => setPinFecha(e.target.value.replace(/\D/g,""))} placeholder="0011" /></Field>
+          {showRapida && (
+            <div className="mt-3 grid md:grid-cols-5 gap-2 items-end bg-[var(--cream)]/60 border border-[var(--gold)]/30 rounded-xl p-3">
+              <Field label="Nombre"><Input value={quickNombre} onChange={e => setQuickNombre(e.target.value)} placeholder="Ej: iPhone pedido" /></Field>
+              <Field label="Costo"><Input type="number" value={quickCosto} onChange={e => setQuickCosto(+e.target.value || 0)} /></Field>
+              <Field label="Precio"><Input type="number" value={quickPrecio} onChange={e => setQuickPrecio(+e.target.value || 0)} /></Field>
+              <Field label="Cant."><Input type="number" min={1} value={quickStock} onChange={e => setQuickStock(Math.max(1, +e.target.value || 1))} /></Field>
+              <Btn variant="ink" onClick={addQuick} className="h-10">Agregar</Btn>
             </div>
-          </Card>
-        )}
+          )}
 
-        <Card className="border-[var(--gold)]/30 bg-[var(--cream)]/60">
-          <h3 className="font-display text-xl text-[var(--gold-dark)] mb-3">Venta rápida personalizada</h3>
-          <div className="grid md:grid-cols-5 gap-3 items-end">
-            <Field label="Nombre"><Input value={quickNombre} onChange={e => setQuickNombre(e.target.value)} placeholder="Ej: iPhone pedido" /></Field>
-            <Field label="Costo compra"><Input type="number" value={quickCosto} onChange={e => setQuickCosto(+e.target.value || 0)} /></Field>
-            <Field label="Precio venta"><Input type="number" value={quickPrecio} onChange={e => setQuickPrecio(+e.target.value || 0)} /></Field>
-            <Field label="Stock/Cant."><Input type="number" min={1} value={quickStock} onChange={e => setQuickStock(Math.max(1, +e.target.value || 1))} /></Field>
-            <Btn variant="ink" onClick={addQuick} className="h-10">Agregar rápido</Btn>
-          </div>
-        </Card>
-
-        <Card>
-          <h3 className="font-display text-xl text-[var(--gold)] mb-3">Carrito ({items.length})</h3>
-          {items.length === 0 ? <p className="text-sm text-gray-500">No hay productos agregados.</p> : (
-            <div className="space-y-3">
+          {items.length > 0 && (
+            <div className="mt-4 space-y-2 border-t border-[var(--line)] pt-3">
               {items.map(i => {
                 const ganancia = i.precioUnitario - i.costo;
-                const margen = i.precioUnitario > 0 ? (ganancia / i.precioUnitario) * 100 : 0;
                 return (
                   <div key={i.id} className="border border-[var(--line)] rounded-lg p-3">
                     <div className="flex items-start justify-between gap-2">
@@ -307,50 +363,107 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
                       <Field label="Precio unit."><Input type="number" value={i.precioUnitario} onChange={e => updateItem(i.id, { precioUnitario: +e.target.value || 0 })} /></Field>
                       <Field label="Cantidad"><Input type="number" min={1} value={i.cantidad} onChange={e => updateItem(i.id, { cantidad: Math.max(1, +e.target.value || 1) })} /></Field>
-                      <Field label="Descuento"><Input type="number" value={i.descuento || 0} onChange={e => updateItem(i.id, { descuento: +e.target.value || 0 })} /></Field>
-                      <Field label="Subtotal"><div className="px-3 py-2 font-display text-2xl text-[var(--gold)]">{fmtCOP(i.subtotal)}</div></Field>
+                      <Field label="Descuento ítem"><Input type="number" value={i.descuento || 0} onChange={e => updateItem(i.id, { descuento: +e.target.value || 0 })} /></Field>
+                      <Field label="Subtotal"><div className="px-3 py-2 font-display text-xl text-[var(--gold)]">{fmtCOP(i.subtotal)}</div></Field>
                     </div>
-                    <div className={`text-xs mt-1 ${ganancia >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                      Ganancia: {fmtCOP(ganancia)} ({margen.toFixed(1)}%)
-                    </div>
+                    {profile?.rol === "admin" && (
+                      <div className={`text-xs mt-1 ${ganancia >= 0 ? "text-emerald-600" : "text-red-600"}`}>Ganancia: {fmtCOP(ganancia)}</div>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
-          <div className="mt-4 border-t border-[var(--line)] pt-3 space-y-1">
-            <div className="flex justify-between text-sm"><span className="text-gray-500">Descuentos</span><span className="text-red-600">− {fmtCOP(descuentoTotal)}</span></div>
-            <div className="flex justify-between items-center"><span className="text-sm text-gray-400 uppercase tracking-widest">Total</span><span className="font-display text-4xl text-[var(--gold)]">{fmtCOP(total)}</span></div>
-          </div>
-        </Card>
+        </Section>
 
-        <Card>
-          <Tabs
-            tabs={[{ id: "contado", label: "💵 Contado" }, { id: "credito", label: "💳 Crédito" }, { id: "tradein", label: "🔄 Celular como pago" }]}
-            active={tipoPago}
-            onChange={(v) => setTipoPago(v as never)}
-          />
-          {tipoPago === "contado" && (
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Método"><Select value={metodo} onChange={e => setMetodo(e.target.value as never)}>
-                <option value="efectivo">Efectivo</option><option value="nequi">Nequi</option>
-                <option value="transferencia">Transferencia</option><option value="datafono">Datáfono</option>
-              </Select></Field>
-              <Field label="Recibido"><Input type="number" value={recibido} onChange={e => setRecibido(+e.target.value || 0)} /></Field>
-              <Field label="Vuelto"><div className="px-3 py-2 text-[var(--gold)] font-bold">{fmtCOP(Math.max(0, recibido - total))}</div></Field>
-              <Field label="Asesor"><Input value={asesor} onChange={e => setAsesor(e.target.value)} placeholder="Nombre de quien atiende" /></Field>
+        <Section title="2. Cliente" subtitle="El nombre es obligatorio para toda venta">
+          <Field label="Nombre del cliente (obligatorio)">
+            <Input value={cNombre} onChange={e => setCNombre(e.target.value)} placeholder="Nombre de quien compra" required />
+          </Field>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <Checkbox label="IMEI" checked={showImei} onChange={setShowImei} />
+            <Checkbox label="Cédula" checked={showCedula} onChange={setShowCedula} />
+            <Checkbox label="Número de celular" checked={showCelular} onChange={setShowCelular} />
+            <Checkbox label="Dirección" checked={showDireccion} onChange={setShowDireccion} />
+          </div>
+          {(showImei || showCedula || showCelular || showDireccion) && (
+            <div className="grid md:grid-cols-2 gap-3 mt-3">
+              {showImei && <Field label="IMEI del producto"><Input value={imei} onChange={e => setImei(e.target.value)} placeholder="Ej: 353454545454545" /></Field>}
+              {showCedula && <Field label="Cédula del cliente"><Input value={cCedula} onChange={e => setCCedula(e.target.value.replace(/\D/g, ""))} placeholder="1.234.567.890" /></Field>}
+              {showCelular && <Field label="Número de celular"><Input value={cTel} onChange={e => setCTel(e.target.value.replace(/\D/g, ""))} placeholder="300 123 4567" /></Field>}
+              {showDireccion && <Field label="Dirección de entrega"><Input value={cDireccion} onChange={e => setCDireccion(e.target.value)} placeholder="Calle 123 #45-67" /></Field>}
             </div>
           )}
+          {clienteExistente && (
+            <div className="mt-3 flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
+              <div className="text-sm text-emerald-800">
+                <span className="font-bold">Cliente conocido:</span> {clienteExistente.nombre} · {clienteExistente.compras.length} compra{clienteExistente.compras.length !== 1 ? "s" : ""} anterior{clienteExistente.compras.length !== 1 ? "es" : ""}
+                <span className="text-emerald-600"> · última el {new Date(clienteExistente.ultimaCompra).toLocaleDateString("es-CO")}</span>
+              </div>
+              {clienteExistente.nombre.toLowerCase() !== cNombre.trim().toLowerCase() && (
+                <button type="button" onClick={usarDatosCliente} className="text-xs font-bold text-emerald-700 underline shrink-0">Usar sus datos</button>
+              )}
+            </div>
+          )}
+        </Section>
+
+        <Section title="3. Garantía" subtitle="Aplica a todos los productos de esta venta" defaultOpen={false}>
+          <div className="grid md:grid-cols-2 gap-3 items-end">
+            <Field label="Duración de garantía">
+              <Select value={garantiaMeses} onChange={e => setGarantiaMeses(+e.target.value as 0 | 6 | 12)}>
+                <option value={0}>Sin garantía</option>
+                <option value={6}>6 meses</option>
+                <option value={12}>12 meses</option>
+              </Select>
+            </Field>
+            {vencimientoPreview && (
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
+                <ShieldCheck className="w-4 h-4 shrink-0" /> Vence el {vencimientoPreview}
+              </div>
+            )}
+          </div>
+        </Section>
+
+        {retroMode && (
+          <Section title="Venta con fecha manual" subtitle="Solo para registrar ventas atrasadas">
+            <div className="grid md:grid-cols-2 gap-3">
+              <Field label="Fecha real"><Input type="date" value={fechaFactura.slice(0, 10)} onChange={e => setFechaFactura(`${e.target.value}${fechaFactura.slice(10) || "T12:00"}`)} /></Field>
+              <Field label="Hora"><Input type="time" value={(fechaFactura.split("T")[1] || "12:00").slice(0, 5)} onChange={e => setFechaFactura(`${fechaFactura.slice(0, 10)}T${e.target.value}`)} /></Field>
+              <Field label="PIN requerido"><Input type="password" maxLength={4} value={pinFecha} onChange={e => setPinFecha(e.target.value.replace(/\D/g, ""))} placeholder="0011" /></Field>
+            </div>
+          </Section>
+        )}
+
+        <Section title="4. Información de pago">
+          <div className="grid md:grid-cols-3 gap-3">
+            <Field label="Tipo de venta">
+              <Select value={tipoPago} onChange={e => setTipoPago(e.target.value as never)}>
+                <option value="contado">Contado</option>
+                <option value="credito">Crédito</option>
+                <option value="tradein">Celular como parte de pago</option>
+              </Select>
+            </Field>
+            <Field label="Forma de pago">
+              <Select value={metodo} onChange={e => setMetodo(e.target.value as never)}>
+                <option value="efectivo">Efectivo</option>
+                <option value="nequi">Nequi</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="datafono">Datáfono</option>
+              </Select>
+            </Field>
+            <Field label="Descuento (monto)"><Input type="number" value={descuentoOrden} onChange={e => setDescuentoOrden(Math.max(0, +e.target.value || 0))} placeholder="$ 0" /></Field>
+          </div>
+
           {tipoPago === "credito" && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid md:grid-cols-3 gap-3 mt-3 pt-3 border-t border-[var(--line)]">
+              <Field label="Empresa de crédito"><Input value={empresaCredito} onChange={e => setEmpresaCredito(e.target.value)} placeholder="Ej: Addi, Sistecrédito..." /></Field>
               <Field label="Cuota inicial"><Input type="number" value={cInicial} onChange={e => setCInicial(+e.target.value || 0)} /></Field>
               <Field label="# Cuotas"><Input type="number" min={1} value={cCuotas} onChange={e => setCCuotas(Math.max(1, +e.target.value))} /></Field>
               <Field label="Valor por cuota"><div className="px-3 py-2 text-[var(--gold)] font-bold">{fmtCOP(cValorCuota)}</div></Field>
-              <Field label="Asesor"><Input value={asesor} onChange={e => setAsesor(e.target.value)} /></Field>
             </div>
           )}
           {tipoPago === "tradein" && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid md:grid-cols-3 gap-3 mt-3 pt-3 border-t border-[var(--line)]">
               <Field label="Marca del cel"><Input value={tMarca} onChange={e => setTMarca(e.target.value)} /></Field>
               <Field label="Modelo"><Input value={tModelo} onChange={e => setTModelo(e.target.value)} /></Field>
               <Field label="IMEI (opcional)"><Input value={tImei} onChange={e => setTImei(e.target.value)} /></Field>
@@ -360,28 +473,49 @@ export function NuevaVenta({ retroMode = false }: { retroMode?: boolean }) {
                 <option value="efectivo">Efectivo</option><option value="nequi">Nequi</option>
                 <option value="transferencia">Transferencia</option><option value="datafono">Datáfono</option>
               </Select></Field>
-              <Field label="Asesor"><Input value={asesor} onChange={e => setAsesor(e.target.value)} /></Field>
             </div>
           )}
+          {(tipoPago === "credito" || tipoPago === "tradein") && !showCelular && !showCedula && (
+            <p className="text-[11px] text-amber-600 mt-2">Para crédito o celular como pago necesitas registrar cédula y celular del cliente — actívalos en "2. Datos adicionales".</p>
+          )}
+        </Section>
+
+        <Section title="Notas y local" defaultOpen={false}>
+          <div className="grid md:grid-cols-2 gap-3">
+            <Field label="Observaciones"><Textarea rows={2} value={obs} onChange={e => setObs(e.target.value)} placeholder="Notas internas..." /></Field>
+            <Field label="Local">
+              <Select value={local} onChange={e => setLocal(+e.target.value as 1 | 2)}>
+                {cfg.local1activo && <option value={1}>{cfg.local1nombre}</option>}
+                {cfg.local2activo && <option value={2}>{cfg.local2nombre}</option>}
+              </Select>
+            </Field>
+          </div>
+        </Section>
+      </div>
+
+      <div className="space-y-3 lg:sticky lg:top-20 self-start">
+        <Card className="bg-gradient-to-br from-[var(--gold-dark)]/30 to-[var(--gold)]/10 border-[var(--gold)]/40">
+          <div className="text-xs uppercase text-gray-400 tracking-widest">Factura actual</div>
+          <div className="font-display text-4xl text-[var(--gold)]">{fmtFactura(num)}</div>
+          <div className="text-xs text-gray-500 mt-1">Vendedor: {profile?.nombre} {profile?.apellido}</div>
         </Card>
 
         <Card>
-          <Field label="Observaciones"><Textarea rows={2} value={obs} onChange={e => setObs(e.target.value)} placeholder="Notas internas, IMEI, detalles del pago..." /></Field>
-          <Field label="Garantía de esta venta"><Textarea rows={2} value={garantia} onChange={e => setGarantia(e.target.value)} placeholder={cfg.facturaGarantia} /></Field>
-          <Field label="Local">
-            <Select value={local} onChange={e => setLocal(+e.target.value as 1 | 2)}>
-              {cfg.local1activo && <option value={1}>{cfg.local1nombre}</option>}
-              {cfg.local2activo && <option value={2}>{cfg.local2nombre}</option>}
-            </Select>
-          </Field>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-sm"><span className="text-gray-500">Subtotal</span><span>{fmtCOP(itemsTotal)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-500">Descuento</span><span className="text-red-600">− {fmtCOP(descuentoOrden + descuentoItems)}</span></div>
+            <div className="flex justify-between items-center pt-1 border-t border-[var(--line)]"><span className="text-sm text-gray-400 uppercase tracking-widest">Total</span><span className="font-display text-3xl text-[var(--gold)]">{fmtCOP(total)}</span></div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-[var(--line)] space-y-2">
+            <Field label="Dinero recibido"><Input type="number" value={recibido} onChange={e => setRecibido(+e.target.value || 0)} /></Field>
+            {recibido >= total ? (
+              <div className="flex justify-between text-sm bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2"><span className="text-emerald-700 font-semibold">Cambio a entregar</span><span className="font-bold text-emerald-700">{fmtCOP(cambio)}</span></div>
+            ) : recibido > 0 ? (
+              <div className="flex justify-between text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2"><span className="text-red-600 font-semibold">Falta por pagar</span><span className="font-bold text-red-600">{fmtCOP(faltante)}</span></div>
+            ) : null}
+          </div>
         </Card>
-      </div>
 
-      <div className="space-y-4">
-        <Card className="bg-gradient-to-br from-[var(--gold-dark)]/30 to-[var(--gold)]/10 border-[var(--gold)]/40">
-          <div className="text-xs uppercase text-gray-400 tracking-widest">Factura actual</div>
-          <div className="font-display text-5xl text-[var(--gold)]">{fmtFactura(num)}</div>
-        </Card>
         <Btn onClick={finalizar} disabled={saving} className="w-full py-4 text-base"><Plus className="inline w-4 h-4 -mt-0.5" /> {saving ? "Guardando..." : "Finalizar venta"}</Btn>
         <Btn variant="ghost" onClick={imprimir} className="w-full">🖨 Imprimir factura</Btn>
         <Btn variant="ok" onClick={enviarWhatsapp} className="w-full"><MessageCircle className="inline w-4 h-4 -mt-0.5" /> Enviar factura WhatsApp</Btn>
