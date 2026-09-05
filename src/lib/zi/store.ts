@@ -15,6 +15,7 @@ export type Perfil = {
   rol: "admin" | "asesor";
   activo: boolean;
   comision_pct: number;
+  frecuencia_pago: "semanal" | "quincenal" | "mensual";
   creado_en: string;
 };
 
