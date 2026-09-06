@@ -45,11 +45,13 @@ async function toBlackWhite(dataUrl: string): Promise<string> {
 }
 
 // ───────── FACTURA TÉRMICA (una venta) ─────────
-// La altura del papel se calcula DIBUJANDO el contenido una vez en un
-// documento de prueba (bien alto) y midiendo dónde terminó. Así el recibo
-// nunca vuelve a "salir mocho": no importa si la garantía es más larga, si
-// hay observaciones, crédito, etc. — la hoja siempre mide justo lo que el
-// contenido necesita, más un margen de seguridad al final.
+// Esta es la tipografía/tamaño que se pidió mantener ("Q2": la que se veía
+// grande y con buen espaciado). Lo único que cambia frente a esa versión es
+// el nombre del cliente (sin negrilla, como se pidió aparte) y CÓMO se
+// calcula el alto del papel: en vez de adivinar un número, se dibuja el
+// contenido una vez en una hoja de prueba bien alta para medir dónde
+// termina de verdad, y la hoja final se crea con ese alto exacto + margen.
+// Así nunca se corta nada, sea cual sea el contenido de la venta.
 function dibujarFactura(doc: jsPDF, venta: Venta, cfg: ZIConfig, logoData: string | undefined): number {
   const w = 80;
   const left = 5;
@@ -65,13 +67,13 @@ function dibujarFactura(doc: jsPDF, venta: Venta, cfg: ZIConfig, logoData: strin
     doc.setFont("courier", bold ? "bold" : "normal");
     doc.setTextColor(0, 0, 0);
     doc.text(txt, w / 2, y, { align: "center" });
-    y += size * 0.46;
+    y += size * 0.42;
   };
   const rule = (heavy = false) => {
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(heavy ? 0.45 : 0.18);
     doc.line(left, y, right, y);
-    y += heavy ? 2.8 : 2.3;
+    y += heavy ? 2.5 : 2;
   };
   const dash = () => {
     doc.setDrawColor(0, 0, 0);
@@ -79,15 +81,15 @@ function dibujarFactura(doc: jsPDF, venta: Venta, cfg: ZIConfig, logoData: strin
     doc.setLineDashPattern([0.7, 0.7], 0);
     doc.line(left, y, right, y);
     doc.setLineDashPattern([], 0);
-    y += 2.8;
+    y += 2.5;
   };
-  const row = (l: string, r: string, size = 8.3, bold = false) => {
+  const row = (l: string, r: string, size = 8, bold = false) => {
     doc.setFontSize(size);
     doc.setFont("courier", bold ? "bold" : "normal");
     doc.setTextColor(0, 0, 0);
     doc.text(l, left, y);
     doc.text(r, right, y, { align: "right" });
-    y += size * 0.62;
+    y += size * 0.55;
   };
 
   center(cfg.storeName.toUpperCase().replace("ZONA IPHONE", "ZONA  IPHONE"), 14, true);
@@ -96,51 +98,50 @@ function dibujarFactura(doc: jsPDF, venta: Venta, cfg: ZIConfig, logoData: strin
   center("NIT: 1001882175", 7.5);
   const addressLines = doc.splitTextToSize(cfg.direccion, 62);
   doc.setFontSize(7.3); doc.setFont("courier", "normal"); doc.setTextColor(0, 0, 0);
-  doc.text(addressLines, w / 2, y, { align: "center" }); y += addressLines.length * 3.4 + 1.2;
+  doc.text(addressLines, w / 2, y, { align: "center" }); y += addressLines.length * 3.3 + 1;
   center("+" + cfg.whatsapp, 7.5);
   center("zonaiphone23@gmail.com", 7.3);
-  y += 1.2; dash();
+  y += 1; dash();
 
   const fecha = new Date(venta.fecha).toLocaleDateString("es-CO");
   const hora = new Date(venta.fecha).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
   row("Numero", venta.factura, 8.5, true);
-  row("Fecha", `${fecha}  ${hora}`, 7.7, false);
+  row("Fecha", `${fecha}  ${hora}`, 7.8, false);
   row("Sucursal", venta.local === 1 ? cfg.local1nombre : cfg.local2nombre, 8.3, false);
   row("Vendedor", venta.asesor || "—", 8.3, false);
-  y += 0.6; dash();
+  dash();
 
   if (venta.cliente?.nombre) {
-    // Sin negrilla en el nombre del cliente (lo único que se pidió cambiar
-    // aquí), un poco más grande que el resto de filas para que resalte.
-    row("Cliente", venta.cliente.nombre.toUpperCase(), 8.6, false);
+    // Único cambio pedido frente a la versión que gustó: sin negrilla aquí.
+    row("Cliente", venta.cliente.nombre.toUpperCase(), 8.5, false);
     if (venta.cliente.cedula) row("Identificacion", venta.cliente.cedula, 8.3, false);
     if (venta.cliente.telefono) row("Telefono", venta.cliente.telefono, 8.3, false);
-    y += 0.6; dash();
+    dash();
   }
 
   doc.setFontSize(9); doc.setFont("courier", "bold"); doc.setTextColor(0, 0, 0);
-  doc.text("DETALLE", left, y); y += 5;
+  doc.text("DETALLE", left, y); y += 4.8;
 
   venta.productos.forEach(p => {
     const lines = doc.splitTextToSize(p.nombre.toUpperCase(), 48);
     doc.setFont("courier", "bold"); doc.setFontSize(8.3); doc.setTextColor(0, 0, 0);
     doc.text(lines, left, y);
-    y += lines.length * 4;
+    y += lines.length * 3.9;
     row(`${p.cantidad} x ${fmtCOP(p.precioUnitario)}`, fmtCOP(p.subtotal), 8.3, false);
     if (p.descuento) row("Descuento", `- ${fmtCOP(p.descuento)}`, 7.6, false);
     if (p.color) row("Color", p.color, 7.6, false);
   });
-  y += 0.6; dash();
+  dash();
   row("Subtotal", fmtCOP(venta.total + (venta.descuentoTotal || 0)), 8.3, false);
   if (venta.descuentoTotal) row("Descuento", `- ${fmtCOP(venta.descuentoTotal)}`, 8.3, false);
 
-  y += 1.3; rule(true);
-  y += 5;
+  y += 1; rule(true);
+  y += 4.5;
   doc.setTextColor(0, 0, 0); doc.setFont("courier", "bold"); doc.setFontSize(14);
   doc.text("TOTAL", left, y);
   doc.text(fmtCOP(venta.total), right, y, { align: "right" });
-  y += 5.5;
-  rule(true); y += 1.3;
+  y += 5;
+  rule(true); y += 1;
 
   row("Forma de pago", venta.tipo === "contado" ? (venta.metodoPago || "Contado") : venta.tipo === "credito" ? "Credito" : "Trade-In", 8.3, false);
   if (venta.tipo === "contado" && venta.recibido) {
@@ -157,25 +158,25 @@ function dibujarFactura(doc: jsPDF, venta: Venta, cfg: ZIConfig, logoData: strin
     row("Restante", `${fmtCOP(venta.tradeIn.restante)} (${venta.tradeIn.metodoRestante})`, 8.3, false);
   }
   if (venta.observaciones) {
-    y += 1.3; doc.setFont("courier", "bold"); doc.setFontSize(7.8); doc.text("OBSERVACIONES", left, y); y += 4.3;
-    doc.setFont("courier", "normal"); doc.setFontSize(7.8);
+    y += 1; doc.setFont("courier", "bold"); doc.setFontSize(8); doc.text("OBSERVACIONES", left, y); y += 4.2;
+    doc.setFont("courier", "normal"); doc.setFontSize(8);
     const obs = doc.splitTextToSize(venta.observaciones, right - left);
-    doc.text(obs, left, y); y += obs.length * 3.8;
+    doc.text(obs, left, y); y += obs.length * 3.6;
   }
-  y += 1.3; dash();
+  y += 1; dash();
 
   doc.setFontSize(8.3); doc.setFont("courier", "bold"); doc.setTextColor(0, 0, 0);
-  doc.text("GARANTIA", left, y); y += 5;
+  doc.text("GARANTIA", left, y); y += 4.8;
   doc.setFont("courier", "normal"); doc.setFontSize(7.7); doc.setTextColor(0, 0, 0);
   const garantia = doc.splitTextToSize(venta.garantia || cfg.facturaGarantia, right - left);
-  doc.text(garantia, left, y); y += garantia.length * 4;
+  doc.text(garantia, left, y); y += garantia.length * 3.9;
 
-  y += 2.5;
+  y += 2;
   if (venta.asesor) { center(`Atendido por: ${venta.asesor}`, 7.5, false); }
   dash();
   doc.setFontSize(12.5); doc.setFont("courier", "bold"); doc.setTextColor(0, 0, 0);
-  doc.text("¡Gracias por su compra!", w / 2, y, { align: "center" }); y += 6.3;
-  doc.setFontSize(7.3); doc.setFont("courier", "normal");
+  doc.text("¡Gracias por su compra!", w / 2, y, { align: "center" }); y += 6;
+  doc.setFontSize(7.5); doc.setFont("courier", "normal");
   const gracias = doc.splitTextToSize(cfg.facturaGracias, w - 8);
   doc.text(gracias, w / 2, y, { align: "center" });
   y += gracias.length * 3.4;
@@ -187,15 +188,12 @@ export async function generarFacturaPDF(venta: Venta, cfg: ZIConfig) {
   const rawLogo = cfg.logoUrl ? await loadImageAsDataURL(cfg.logoUrl) : undefined;
   const logoData = rawLogo ? await toBlackWhite(rawLogo) : undefined;
 
-  // Pasada 1 (de medición): se dibuja todo en una hoja de prueba bien alta
-  // (1000mm) solo para averiguar en qué "y" terminó el contenido real. No se
-  // guarda ni se muestra al usuario.
+  // Pasada de medición: se dibuja todo en una hoja de prueba bien alta
+  // (1000mm) solo para saber en qué "y" terminó el contenido real.
   const medidor = new jsPDF({ unit: "mm", format: [80, 1000] });
   const finalY = dibujarFactura(medidor, venta, cfg, logoData);
 
-  // Pasada 2 (la real): se crea la hoja del tamaño exacto que hizo falta
-  // (+8mm de margen de seguridad al final) y se dibuja de nuevo, ya para
-  // guardar de verdad.
+  // Pasada real: hoja del tamaño exacto que hizo falta (+8mm de margen).
   const receiptHeight = Math.max(120, finalY + 8);
   const doc = new jsPDF({ unit: "mm", format: [80, receiptHeight] });
   dibujarFactura(doc, venta, cfg, logoData);
