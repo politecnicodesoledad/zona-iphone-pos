@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useConfig, useProductos } from "@/lib/zi/store";
 import { generarFacturaPDF } from "@/lib/zi/pdf";
-import { pushAllToCloud, pullAllFromCloud, type SyncReport } from "@/lib/zi/cloud-sync";
 import { Card, Btn, Input, Select, Textarea, Tabs, Field } from "./ui";
 import type { Venta, EventType } from "@/lib/zi/types";
-import { Cloud, CloudUpload, CloudDownload, MapPin, Trash2, Upload } from "lucide-react";
+import { MapPin, Trash2, Upload } from "lucide-react";
 import { addCustomGallery, pullCustomGallery, readCustomGallery, removeCustomGallery, type CustomGaleriaItem } from "@/lib/zi/gallery-store";
 
 export function Configuracion() {
@@ -14,14 +13,12 @@ export function Configuracion() {
       <Tabs tabs={[
         { id: "ajustes", label: "⚙️ Ajustes" },
         { id: "locales", label: "📍 Locales" },
-        { id: "nube", label: "☁️ Nube" },
         { id: "galeria", label: "🖼 Galería" },
         { id: "eventos", label: "🎉 Eventos" },
         { id: "video", label: "🎬 Video" },
       ]} active={tab} onChange={setTab} />
       {tab === "ajustes" && <Ajustes />}
       {tab === "locales" && <Locales />}
-      {tab === "nube" && <Nube />}
       {tab === "galeria" && <Galeria />}
       {tab === "eventos" && <Eventos />}
       {tab === "video" && <Video />}
@@ -151,60 +148,6 @@ function Locales() {
       })}
       <Btn onClick={save} className="w-full mt-3">💾 Guardar locales</Btn>
     </Card>
-  );
-}
-
-function Nube() {
-  const [busy, setBusy] = useState(false);
-  const [report, setReport] = useState<SyncReport | null>(null);
-  async function run(fn: () => Promise<SyncReport>) {
-    setBusy(true); setReport(null);
-    setReport(await fn());
-    setBusy(false);
-  }
-  return (
-    <div className="space-y-4">
-      <Card className="bg-blue-50 border-blue-200">
-        <h3 className="font-display text-2xl text-blue-900 flex items-center gap-2"><Cloud className="w-6 h-6" /> Sincronización con la nube</h3>
-        <p className="text-sm text-blue-900 mt-2">
-          Tu base de datos está conectada a Supabase. Antes de sincronizar la primera vez:
-        </p>
-        <ol className="list-decimal pl-5 text-sm text-blue-900 mt-2 space-y-1">
-          <li>Abre <b>supabase.com/dashboard</b> → tu proyecto → <b>SQL Editor</b></li>
-          <li>Pega el contenido del archivo <code className="bg-white px-1.5 py-0.5 rounded border border-blue-200">SUPABASE_SETUP.sql</code> (está en la raíz del proyecto)</li>
-          <li>Presiona <b>Run</b> (botón verde)</li>
-          <li>Vuelve aquí y haz click en <b>"Subir datos locales"</b></li>
-        </ol>
-      </Card>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <h4 className="font-display text-xl flex items-center gap-2 text-emerald-700"><CloudUpload className="w-5 h-5" /> Subir a la nube</h4>
-          <p className="text-xs text-gray-500 mt-1">Sube todo lo que está en este dispositivo (productos, ventas, clientes, config) a Supabase.</p>
-          <Btn variant="ok" onClick={() => run(pushAllToCloud)} disabled={busy} className="w-full mt-4">
-            {busy ? "Subiendo..." : "⬆️ Subir datos locales"}
-          </Btn>
-        </Card>
-        <Card>
-          <h4 className="font-display text-xl flex items-center gap-2 text-blue-700"><CloudDownload className="w-5 h-5" /> Bajar de la nube</h4>
-          <p className="text-xs text-gray-500 mt-1">Reemplaza los datos locales con los que están en Supabase (útil para sincronizar entre dispositivos).</p>
-          <Btn variant="ink" onClick={() => run(pullAllFromCloud)} disabled={busy} className="w-full mt-4">
-            {busy ? "Bajando..." : "⬇️ Bajar de la nube"}
-          </Btn>
-        </Card>
-      </div>
-
-      {report && (
-        <Card className={report.ok ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}>
-          <div className={`font-bold ${report.ok ? "text-emerald-800" : "text-red-800"}`}>{report.ok ? "✓" : "✗"} {report.message}</div>
-          {report.details && (
-            <ul className="text-xs text-gray-700 mt-2 space-y-0.5 font-mono">
-              {report.details.map((d, i) => <li key={i}>{d}</li>)}
-            </ul>
-          )}
-        </Card>
-      )}
-    </div>
   );
 }
 
