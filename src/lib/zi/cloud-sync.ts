@@ -179,6 +179,11 @@ function sortCollection(key: string, items: any[]) {
 }
 
 export async function pullAllFromCloud(options: { merge?: boolean; silent?: boolean } = {}): Promise<SyncReport> {
+  // merge por defecto en TRUE a propósito: bajar de la nube nunca debe poder
+  // borrar una venta (o cualquier otro dato) que se hizo en este dispositivo
+  // y que todavía no se ha subido. Si de verdad se necesita un reemplazo
+  // total alguna vez, hay que pedirlo explícitamente con { merge: false }.
+  const merge = options.merge ?? true;
   if (!(await ziCloudReady())) {
     return { ok: false, message: "El schema no está creado en Supabase. Pega SUPABASE_SETUP.sql primero." };
   }
@@ -199,7 +204,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
       if (error) throw new Error(`${c.key}: ${error.message}`);
       const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(c.key));
       const local = c.get() as any[];
-      const arr = sortCollection(c.key, removeDeleted(options.merge ? mergeById(local, remote, isDirty(c.key)) : remote, deleted.get(c.key)));
+      const arr = sortCollection(c.key, removeDeleted(merge ? mergeById(local, remote, isDirty(c.key)) : remote, deleted.get(c.key)));
       c.set(arr);
       details.push(`✓ ${c.key}: ${arr.length}`);
     }
@@ -208,7 +213,7 @@ export async function pullAllFromCloud(options: { merge?: boolean; silent?: bool
       if (error) throw new Error(`${k}: ${error.message}`);
       const remote = removeDeleted((data || []).map((r: any) => r.data), deleted.get(k));
       const local = readLS<any>(k);
-      const arr = sortCollection(k, removeDeleted(options.merge ? mergeById(local, remote, isDirty(k)) : remote, deleted.get(k)));
+      const arr = sortCollection(k, removeDeleted(merge ? mergeById(local, remote, isDirty(k)) : remote, deleted.get(k)));
       writeLS(k, arr);
       details.push(`✓ ${k}: ${arr.length}`);
     }
