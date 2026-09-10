@@ -88,23 +88,33 @@ async function upsertRows(key: string, items: any[]) {
 
 export async function pushConfigToCloud(cfg: ZIConfig) {
   if (applyingCloud || !(await ziCloudReady())) return;
-  await ziSupabase.from("zi_config").upsert({ id: "singleton", data: cfg, updated_at: new Date().toISOString() });
+  await withNetTimeout(ziSupabase.from("zi_config").upsert({ id: "singleton", data: cfg, updated_at: new Date().toISOString() }), "configuración");
 }
 
 export async function pushCollectionToCloud(key: string, value: unknown) {
   if (applyingCloud || !(await ziCloudReady())) return;
   if (key === "facturaNum") {
-    await ziSupabase.from("zi_counters").upsert({ name: "factura", value: Number(value) || 1, updated_at: new Date().toISOString() });
+    await withNetTimeout(ziSupabase.from("zi_counters").upsert({ name: "factura", value: Number(value) || 1, updated_at: new Date().toISOString() }), "contador");
     return;
   }
-  if (Array.isArray(value)) await upsertRows(key, value);
+  if (Array.isArray(value)) await withNetTimeout(upsertRows(key, value), key);
 }
 
+// CRÍTICO: esta llamada ocurre en medio de "Finalizar venta" (NuevaVenta.tsx
+// la espera con await antes de guardar). Sin límite de tiempo, una red que
+// se cuelga a medias deja la venta esperando PARA SIEMPRE — ni se guarda ni
+// avisa error, el botón se queda pegado en "Guardando...". Con el timeout,
+// en el peor caso cae al número de factura local en unos segundos y la
+// venta se completa igual.
 export async function nextFacturaNumber(fallback: number) {
-  if (!(await ziCloudReady())) return fallback;
-  const { data, error } = await ziSupabase.rpc("zi_next_factura");
-  if (error || typeof data !== "number") return fallback;
-  return data;
+  try {
+    if (!(await ziCloudReady())) return fallback;
+    const { data, error } = await withTimeout(ziSupabase.rpc("zi_next_factura"), 6000, "número de factura");
+    if (error || typeof data !== "number") return fallback;
+    return data;
+  } catch {
+    return fallback;
+  }
 }
 
 export async function pushAllToCloud(): Promise<SyncReport> {
