@@ -6,12 +6,17 @@ import { fmtCOP, fmtDateTime, maskCedula } from "./format";
 export function facturaWhatsappText(venta: Venta, cfg: ZIConfig) {
   const productos = venta.productos.map(p => `• ${p.nombre} x${p.cantidad} — ${fmtCOP(p.subtotal)}`).join("\n");
   const pago = venta.tipo === "contado" ? `Contado (${venta.metodoPago || "—"})` : venta.tipo === "credito" ? `Crédito: inicial ${fmtCOP(venta.creditoCuotaInicial || 0)}, ${venta.creditoCuotas || 0} cuotas de ${fmtCOP(venta.creditoValorCuota || 0)}` : `Celular como pago${venta.tradeIn ? `: ${venta.tradeIn.marca} ${venta.tradeIn.modelo}` : ""}`;
-  return `${cfg.storeName}\nFACTURA ${venta.factura}\nFecha: ${fmtDateTime(venta.fecha)}\n\nCliente: ${venta.cliente?.nombre || "—"}\nTel: ${venta.cliente?.telefono || "—"}\nCC/NIT: ${venta.cliente?.cedula || "—"}\n\n${productos}\n\nTOTAL: ${fmtCOP(venta.total)}\nPago: ${pago}\n${venta.observaciones ? `Observaciones: ${venta.observaciones}\n` : ""}\nGracias por tu compra.`;
+  const descuentoTotal = (venta.descuentoTotal || 0) + (venta.descuentoOrden || 0);
+  const descuentoLinea = descuentoTotal > 0 ? `Descuento: -${fmtCOP(descuentoTotal)}\n` : "";
+  return `${cfg.storeName}\nFACTURA ${venta.factura}\nFecha: ${fmtDateTime(venta.fecha)}\n\nCliente: ${venta.cliente?.nombre || "—"}\nTel: ${venta.cliente?.telefono || "—"}\nCC/NIT: ${venta.cliente?.cedula || "—"}\n\n${productos}\n\n${descuentoLinea}TOTAL: ${fmtCOP(venta.total)}\nPago: ${pago}\n${venta.observaciones ? `Observaciones: ${venta.observaciones}\n` : ""}\nGracias por tu compra.`;
 }
 
 async function loadImageAsDataURL(url: string): Promise<string | undefined> {
   try {
-    const res = await fetch(url, { mode: "cors" });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { mode: "cors", signal: controller.signal });
+    clearTimeout(timer);
     const blob = await res.blob();
     return await new Promise<string>((resolve, reject) => {
       const r = new FileReader();
@@ -132,8 +137,9 @@ function dibujarFactura(doc: jsPDF, venta: Venta, cfg: ZIConfig, logoData: strin
     if (p.color) row("Color", p.color, 7.6, false);
   });
   dash();
-  row("Subtotal", fmtCOP(venta.total + (venta.descuentoTotal || 0)), 8.3, false);
-  if (venta.descuentoTotal) row("Descuento", `- ${fmtCOP(venta.descuentoTotal)}`, 8.3, false);
+  const descuentoMostrar = (venta.descuentoTotal || 0) + (venta.descuentoOrden || 0);
+  row("Subtotal", fmtCOP(venta.total + descuentoMostrar), 8.3, false);
+  if (descuentoMostrar) row("Descuento", `- ${fmtCOP(descuentoMostrar)}`, 8.3, false);
 
   y += 1; rule(true);
   y += 4.5;
