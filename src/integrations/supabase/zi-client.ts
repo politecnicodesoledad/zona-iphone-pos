@@ -11,9 +11,15 @@ export const ziSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 // Devuelve true si el schema está creado (heurística: zi_config existe).
+// Esta función se llama desde casi todos los caminos de sincronización, así
+// que el timeout va aquí mismo (no en cada quien la llama) — así nadie se
+// puede olvidar de protegerla, y una red colgada nunca bloquea el resto de
+// la app para siempre.
 export async function ziCloudReady(): Promise<boolean> {
   try {
-    const { error } = await ziSupabase.from("zi_config").select("id").limit(1);
+    const query = ziSupabase.from("zi_config").select("id").limit(1);
+    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout: conexión")), 6000));
+    const { error } = await Promise.race([query, timeout]);
     return !error;
   } catch {
     return false;
